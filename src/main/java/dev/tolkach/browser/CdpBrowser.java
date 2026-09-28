@@ -19,6 +19,8 @@ public class CdpBrowser implements AutoCloseable{
     public static CdpBrowser connect(String cdpUrl) {
         Playwright playwright = Playwright.create();
 
+        playwright.selectors().setTestIdAttribute("data-test-id");
+
         Browser browser = playwright.chromium().connectOverCDP(cdpUrl);
 
         return new CdpBrowser(playwright, browser);

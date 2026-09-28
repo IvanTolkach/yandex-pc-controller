@@ -2,6 +2,7 @@ package dev.tolkach.diagnostics;
 
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
+import com.microsoft.playwright.options.AriaRole;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -50,6 +51,23 @@ public class PageInspector {
         System.out.println("Screenshot saved to: " + Path.of(path).toAbsolutePath());
     }
 
+    public void inspectSearchElements(Page page) {
+        System.out.println();
+        System.out.println("===== SEARCH CANDIDATES =====");
+
+        inspectLocator("input", page.locator("input"));
+        inspectLocator("textarea", page.locator("textarea"));
+        inspectLocator("contenteditable", page.locator("[contenteditable='true']"));
+        inspectLocator("role=textbox", page.getByRole(AriaRole.TEXTBOX));
+
+        System.out.println();
+        System.out.println("===== SEARCH TEST IDS =====");
+
+        Locator searchTestIds = page.locator("[data-test-id*='SEARCH']");
+
+        inspectLocator("data-test-id contains SEARCH", searchTestIds);
+    }
+
     private void dumpElements(Locator locator) {
         int count = locator.count();
 
@@ -81,5 +99,25 @@ public class PageInspector {
         }
 
         return value.replace("\n", " ").replace("\r", " ").trim();
+    }
+
+    private void inspectLocator(String name, Locator locator) {
+        int count = locator.count();
+
+        System.out.println();
+        System.out.println(name + ": " + count);
+
+        for (int i = 0; i < count; i++) {
+            Locator element = locator.nth(i);
+
+            System.out.println("--- element " + i + " ---");
+            System.out.println("tag         = " + safe(element.getAttribute("el => el.tagName")));
+            System.out.println("type        = " + safe(element.getAttribute("type")));
+            System.out.println("placeholder = " + safe(element.getAttribute("placeholder")));
+            System.out.println("aria-label  = " + safe(element.getAttribute("aria-label")));
+            System.out.println("role        = " + safe(element.getAttribute("role")));
+            System.out.println("test-id     = " + safe(element.getAttribute("data-test-id")));
+            System.out.println("outerHTML   = " + safe(element.getAttribute("el => el.outerHTML")));
+        }
     }
 }

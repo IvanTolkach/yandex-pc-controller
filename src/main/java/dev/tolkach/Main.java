@@ -3,10 +3,10 @@ package dev.tolkach;
 import com.microsoft.playwright.Page;
 import dev.tolkach.browser.CdpBrowser;
 import dev.tolkach.diagnostics.PageInspector;
+import dev.tolkach.yandex.YandexMusicPage;
 
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
 
 public class Main {
 
@@ -19,21 +19,28 @@ public class Main {
 
             System.out.println("Connected!");
 
-            List<Page> pages = cdpBrowser.pages();
+            Page page = cdpBrowser.pages().stream().findFirst().orElseThrow(
+                    () -> new IllegalStateException("Yandex Music not found")
+            );
 
-            if (pages.isEmpty()) {
-                throw new IllegalStateException("No pages found in Yandex Music");
-            }
-
-            Page page = pages.getFirst();
+            YandexMusicPage musicPage = new YandexMusicPage(page);
 
             PageInspector inspector = new PageInspector();
-            inspector.inspect(page);
-            inspector.saveHtml(page, "yandex-music-page.html");
-            inspector.saveScreenshot(page, "yandex-music-page.png");
+
+            System.out.println("Current URL: " + page.url());
+
+            System.out.println("Opening search...");
+
+            musicPage.openSearch();
+
+            page.waitForTimeout(1000);
+
+            System.out.println("Search URL: " + page.url());
+
+            inspector.inspectSearchElements(page);
         }
         catch (Exception e) {
-            System.out.println("Connection refused.");
+            System.out.println("Connection lost. " + e.getMessage());
         }
     }
 }
