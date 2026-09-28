@@ -2,10 +2,26 @@ package dev.tolkach.yandex;
 
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
+import com.microsoft.playwright.options.WaitForSelectorState;
+import dev.tolkach.yandex.model.TrackSearchResult;
+
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.List;
 
 public class SearchPage {
 
     private static final String SEARCH_INPUT_TEST_ID = "SEARCH_PAGE_SEARCH_INPUT";
+
+    private static final String TRACK_CARD_TEST_ID = "SEARCH_TRACK_CARD";
+
+    private static final String TRACK_TITLE_TEST_ID = "TRACK_TITLE";
+
+    private static final String ARTIST_TITLE_TEST_ID = "SEPARATED_ARTIST_TITLE";
+
+    private static final String TRACK_DURATION_TEST_ID = "TRACK_DURATION";
+
+    private static final String PLAY_BUTTON_TEST_ID = "PLAY_BUTTON";
 
     private final Page page;
 
@@ -34,6 +50,97 @@ public class SearchPage {
 
             System.out.println("[" + i + "] " + element.getAttribute("data-test-id"));
         }
+    }
+
+    public List<TrackSearchResult> getTrackResults() {
+        Locator cards = page.getByTestId(TRACK_CARD_TEST_ID);
+
+        cards.first().waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(10000));
+
+        int count = cards.count();
+
+        List<TrackSearchResult> results = new ArrayList<>(count);
+
+        for (int i = 0; i < count; i++) {
+            Locator card = cards.nth(i);
+            results.add(readTrack(card));
+        }
+
+        return  List.copyOf(results);
+    }
+
+    public void playTrack(TrackSearchResult track) {
+        Locator card = findCardByTrackId(track.trackId());
+
+        Locator playButton = card.getByTestId(PLAY_BUTTON_TEST_ID);
+
+        playButton.click();
+    }
+
+    private TrackSearchResult readTrack(Locator card) {
+        Locator titleLink = card.getByTestId(TRACK_TITLE_TEST_ID);
+        Locator artistLinks = card.getByTestId(ARTIST_TITLE_TEST_ID);
+        Locator durationElement = card.getByTestId(TRACK_DURATION_TEST_ID);
+
+        String title = titleLink.innerText().trim();
+        List<String> artists = artistLinks.allInnerTexts()
+                .stream()
+                .map(String::trim)
+                .filter(name -> !name.isBlank())
+                .toList();
+        String duration = durationElement.innerText().trim();
+        String href = titleLink.getAttribute("href");
+
+        if (href == null || href.isBlank()) {
+            throw new IllegalStateException("Track href is missing for: " + title);
+        }
+
+        String albumId = extractQueryParameter(href, "albumId");
+        String trackId = extractQueryParameter(href, "trackId");
+
+        return new TrackSearchResult(title, artists, duration, albumId, trackId);
+    }
+
+    private Locator findCardByTrackId(String trackId) {
+        Locator cards = page.getByTestId(TRACK_CARD_TEST_ID);
+
+        for (int i = 0; i < cards.count(); i++) {
+            Locator card = cards.nth(i);
+
+            Locator titleLink = card.getByTestId(TRACK_TITLE_TEST_ID);
+
+            String href = titleLink.getAttribute("href");
+
+            if (href == null) {
+                continue;
+            }
+
+            String currentTrackId = extractQueryParameter(href, "trackId");
+
+            if (trackId.equals(currentTrackId)) {
+                return card;
+            }
+        }
+        throw new IllegalStateException("Track card not found. trackId=" + trackId);
+    }
+
+    private String extractQueryParameter(String href, String parameter) {
+        URI uri = URI.create(href);
+
+        String query = uri.getRawQuery();
+
+        if (query == null) {
+            throw new IllegalArgumentException("URL has no query parameters: " + href);
+        }
+
+        for (String part : query.split("&")) {
+            String[] pair = part.split("=", 2);
+
+            if (pair.length == 2 && parameter.equals(pair[0])) {
+                return pair[1];
+            }
+        }
+        throw new IllegalArgumentException("Parameter '" + parameter + "' not found in: " + href);
     }
 
     public Page page() {

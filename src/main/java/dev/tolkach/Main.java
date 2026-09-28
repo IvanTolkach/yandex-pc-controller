@@ -2,10 +2,10 @@ package dev.tolkach;
 
 import com.microsoft.playwright.Page;
 import dev.tolkach.browser.CdpBrowser;
-import dev.tolkach.diagnostics.PageInspector;
-import dev.tolkach.diagnostics.SearchResultInspector;
-import dev.tolkach.yandex.SearchPage;
+import dev.tolkach.yandex.YandexMusicClient;
 import dev.tolkach.yandex.YandexMusicPage;
+import dev.tolkach.yandex.matching.TrackMatcher;
+import dev.tolkach.yandex.model.TrackSearchResult;
 
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
@@ -27,22 +27,14 @@ public class Main {
 
             YandexMusicPage musicPage = new YandexMusicPage(page);
 
-            System.out.println("Opening search...");
+            TrackMatcher trackMatcher = new TrackMatcher();
 
-            SearchPage searchPage = musicPage.openSearch();
+            YandexMusicClient client = new YandexMusicClient(musicPage, trackMatcher);
 
-            page.waitForTimeout(500);
+            TrackSearchResult selected = client.playTrack("Damage", "Kai Angel");
 
-            System.out.println("Search page opened: " + page.url());
-            System.out.println("Searching for: Damage Kai Angel");
-
-            searchPage.search("Damage Kai Angel");
-
-            page.waitForTimeout(1000);
-
-            SearchResultInspector inspector = new SearchResultInspector();
-
-            inspector.inspect(page);
+            System.out.println();
+            System.out.println("Playing:\n" + selected);
         }
         catch (Exception e) {
             System.out.println("Connection lost. " + e.getMessage());

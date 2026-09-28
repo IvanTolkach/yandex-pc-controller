@@ -14,6 +14,10 @@ public class YandexMusicPage {
     }
 
     public SearchPage openSearch() {
+        if (page.url().endsWith("/search")) {
+            return new SearchPage(page);
+        }
+
         Locator searchLink = page.getByTestId(SEARCH_NAVIGATION_TEST_ID);
 
         if (!searchLink.isVisible()) {
@@ -23,14 +27,6 @@ public class YandexMusicPage {
         searchLink.click();
 
         return new SearchPage(page);
-    }
-
-    public void search(String query) {
-        //
-    }
-
-    public void playTrack(String title, String artist) {
-        //
     }
 
     public Page page() {
