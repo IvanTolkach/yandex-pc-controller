@@ -3,6 +3,7 @@ package dev.tolkach;
 import com.microsoft.playwright.Page;
 import dev.tolkach.browser.CdpBrowser;
 import dev.tolkach.diagnostics.PageInspector;
+import dev.tolkach.diagnostics.SearchResultInspector;
 import dev.tolkach.yandex.SearchPage;
 import dev.tolkach.yandex.YandexMusicPage;
 
@@ -37,13 +38,11 @@ public class Main {
 
             searchPage.search("Damage Kai Angel");
 
-            page.waitForTimeout(1500);
+            page.waitForTimeout(1000);
 
-            searchPage.printSearchElements();
+            SearchResultInspector inspector = new SearchResultInspector();
 
-            System.out.println();
-            System.out.println("===== SEARCH RESULT PAGE =====");
-            System.out.println(page.locator("body").innerText());
+            inspector.inspect(page);
         }
         catch (Exception e) {
             System.out.println("Connection lost. " + e.getMessage());
