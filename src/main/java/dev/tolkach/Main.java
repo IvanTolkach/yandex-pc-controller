@@ -3,6 +3,7 @@ package dev.tolkach;
 import com.microsoft.playwright.Page;
 import dev.tolkach.browser.CdpBrowser;
 import dev.tolkach.diagnostics.PageInspector;
+import dev.tolkach.yandex.SearchPage;
 import dev.tolkach.yandex.YandexMusicPage;
 
 import java.io.PrintStream;
@@ -25,19 +26,24 @@ public class Main {
 
             YandexMusicPage musicPage = new YandexMusicPage(page);
 
-            PageInspector inspector = new PageInspector();
-
-            System.out.println("Current URL: " + page.url());
-
             System.out.println("Opening search...");
 
-            musicPage.openSearch();
+            SearchPage searchPage = musicPage.openSearch();
 
-            page.waitForTimeout(1000);
+            page.waitForTimeout(500);
 
-            System.out.println("Search URL: " + page.url());
+            System.out.println("Search page opened: " + page.url());
+            System.out.println("Searching for: Damage Kai Angel");
 
-            inspector.inspectSearchElements(page);
+            searchPage.search("Damage Kai Angel");
+
+            page.waitForTimeout(1500);
+
+            searchPage.printSearchElements();
+
+            System.out.println();
+            System.out.println("===== SEARCH RESULT PAGE =====");
+            System.out.println(page.locator("body").innerText());
         }
         catch (Exception e) {
             System.out.println("Connection lost. " + e.getMessage());
