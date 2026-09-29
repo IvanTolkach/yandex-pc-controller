@@ -46,20 +46,9 @@ public class YandexMusicClient {
         TrackSearchResult selected = trackMatcher.findBestMatch(results, title, artist)
                 .orElseThrow(() -> new IllegalStateException("Track not found: " + title + " - " + artist));
 
-        System.out.println();
-        System.out.println("Found " + results.size() + " track results.");
-
-        System.out.println("Selected: " + selected);
-
         searchPage.playTrack(selected);
 
-        System.out.println("Play command sent to Yandex Music.");
-
-        PlaybackState state = playerBar.waitUntilPlaying(selected.trackId(), PLAYBACK_VERIFICATION_TIMEOUT);
-
-        System.out.println("Playback verified: " + state);
-
-        return state;
+        return playerBar.waitUntilPlaying(selected.trackId(), PLAYBACK_VERIFICATION_TIMEOUT);
     }
 
     public PlaybackState getPlaybackState() {

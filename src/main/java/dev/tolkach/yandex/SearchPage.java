@@ -37,6 +37,15 @@ public class SearchPage {
         Locator searchInput = page.getByTestId(SEARCH_INPUT_TEST_ID);
 
         searchInput.fill(query);
+
+        page.waitForFunction("""
+                expected => {
+                    const url = new URL(window.location.href);
+                    return url.searchParams.get("text") === expected;
+                }
+                """, query);
+
+        waitForTrackResult();
     }
 
     public void printSearchElements() {
@@ -75,6 +84,12 @@ public class SearchPage {
         Locator playButton = card.getByTestId(PLAY_BUTTON_TEST_ID);
 
         playButton.click();
+    }
+
+    private void waitForTrackResult() {
+        Locator cards = page.getByTestId(TRACK_CARD_TEST_ID);
+
+        cards.first().waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(10000));
     }
 
     private TrackSearchResult readTrack(Locator card) {

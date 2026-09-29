@@ -3,11 +3,12 @@ package dev.tolkach;
 import com.microsoft.playwright.Page;
 import dev.tolkach.browser.CdpBrowser;
 import dev.tolkach.diagnostics.PlayerDebugInspector;
+import dev.tolkach.music.MusicController;
+import dev.tolkach.music.YandexMusicController;
 import dev.tolkach.yandex.YandexMusicClient;
 import dev.tolkach.yandex.YandexMusicPage;
 import dev.tolkach.yandex.matching.TrackMatcher;
 import dev.tolkach.yandex.model.PlaybackState;
-import dev.tolkach.yandex.model.TrackSearchResult;
 
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
@@ -20,9 +21,6 @@ public class Main {
         System.setOut(new PrintStream(System.out, true, StandardCharsets.UTF_8));
 
         try (CdpBrowser cdpBrowser = CdpBrowser.connect(CDP_URL)) {
-
-            System.out.println("Connected!");
-
             Page page = cdpBrowser.pages().stream().findFirst().orElseThrow(
                     () -> new IllegalStateException("Yandex Music not found")
             );
@@ -33,13 +31,14 @@ public class Main {
 
             YandexMusicClient client = new YandexMusicClient(musicPage, trackMatcher);
 
-            PlaybackState state = client.playTrack("Damage", "Kai Angel");
+            MusicController musicController = new YandexMusicController(client);
 
-            System.out.println();
-            System.out.println("Final playback state:\n" + state);
+            PlaybackState state = musicController.playTrack("Damage", "Kai Angel");
+
+            System.out.println(state);
         }
         catch (Exception e) {
-            System.out.println("Connection lost. " + e.getMessage());
+            System.out.println("ERROR: " + e.getMessage());
         }
     }
 }
