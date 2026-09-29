@@ -20,13 +20,13 @@ public class YandexMusicPage {
 
         Locator searchLink = page.getByTestId(SEARCH_NAVIGATION_TEST_ID);
 
-        if (!searchLink.isVisible()) {
-            throw new IllegalStateException("Search button not found or invisible.");
-        }
-
         searchLink.click();
 
         return new SearchPage(page);
+    }
+
+    public PlayerBar playerBar() {
+        return new PlayerBar(page);
     }
 
     public Page page() {
