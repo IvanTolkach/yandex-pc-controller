@@ -1,6 +1,6 @@
 package dev.tolkach.music.protocol;
 
-import dev.tolkach.music.MusicCommandHandler;
+import dev.tolkach.music.commands.MusicCommandHandler;
 import dev.tolkach.music.commands.MusicCommand;
 import dev.tolkach.yandex.model.PlaybackState;
 

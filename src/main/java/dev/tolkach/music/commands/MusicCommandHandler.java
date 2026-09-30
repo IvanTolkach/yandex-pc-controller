@@ -1,6 +1,6 @@
-package dev.tolkach.music;
+package dev.tolkach.music.commands;
 
-import dev.tolkach.music.commands.*;
+import dev.tolkach.music.MusicController;
 import dev.tolkach.yandex.model.PlaybackState;
 
 import java.util.Objects;
