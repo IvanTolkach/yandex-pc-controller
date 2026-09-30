@@ -22,6 +22,10 @@ public class PlayerBar {
 
     private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(10);
 
+    private static final double PREVIOUS_TRACK_START_THRESHOLD_SECONDS = 3.0;
+
+    private static final Duration PREVIOUS_TRACK_ACTION_TIMEOUT = Duration.ofSeconds(2);
+
     private final Page page;
 
     public PlayerBar(Page page) {
@@ -126,9 +130,23 @@ public class PlayerBar {
     }
 
     public void previous() {
-        Locator playerBar = getPlayerBar();
+        Locator previousButton = getPlayerBar().getByTestId("PREVIOUS_TRACK_BUTTON");
 
-        playerBar.getByTestId("PREVIOUS_TRACK_BUTTON").click();
+        if (!previousButton.isEnabled()) {
+            return;
+        }
+
+        String originalTrackId = getState().trackId();
+
+        previousButton.click();
+
+        if (waitUntilTrackChanged(originalTrackId, Duration.ofSeconds(2))) {
+            return;
+        }
+
+        if (previousButton.isEnabled()) {
+            previousButton.click();
+        }
     }
 
     private Locator getPlayerBar() {
@@ -165,5 +183,38 @@ public class PlayerBar {
         }
 
         throw new IllegalArgumentException("Parameter '" + parameter + "' not found in URL: " + href);
+    }
+
+    private double getCurrentPositionSeconds(Locator playerBar) {
+        Locator slider = playerBar.getByTestId("TIMECODE_SLIDEBAR");
+
+        String value = slider.getAttribute("value");
+
+        if (value == null || value.isBlank()) {
+            return 0.0;
+        }
+
+        try {
+            return Double.parseDouble(value);
+        }
+        catch (NumberFormatException exception) {
+            throw new IllegalStateException("Invalid timecode slider value: " + value, exception);
+        }
+    }
+
+    private boolean waitUntilTrackChanged(String originalTrackId, Duration timeout) {
+        long deadline = System.nanoTime() + timeout.toNanos();
+
+        while (System.nanoTime() < deadline) {
+            PlaybackState currentState = getState();
+
+            if (!originalTrackId.equals(currentState.trackId())) {
+                return true;
+            }
+
+            page.waitForTimeout(100);
+        }
+
+        return false;
     }
 }
