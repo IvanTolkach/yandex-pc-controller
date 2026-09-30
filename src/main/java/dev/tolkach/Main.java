@@ -2,9 +2,10 @@ package dev.tolkach;
 
 import com.microsoft.playwright.Page;
 import dev.tolkach.browser.CdpBrowser;
-import dev.tolkach.diagnostics.PlayerDebugInspector;
+import dev.tolkach.music.MusicCommandHandler;
 import dev.tolkach.music.MusicController;
 import dev.tolkach.music.YandexMusicController;
+import dev.tolkach.music.commands.*;
 import dev.tolkach.yandex.YandexMusicClient;
 import dev.tolkach.yandex.YandexMusicPage;
 import dev.tolkach.yandex.matching.TrackMatcher;
@@ -33,7 +34,9 @@ public class Main {
 
             MusicController musicController = new YandexMusicController(client);
 
-            PlaybackState state = musicController.playTrack("Damage", "Kai Angel");
+            MusicCommandHandler commandHandler = new MusicCommandHandler(musicController);
+
+            PlaybackState state = commandHandler.handle(new PlayTrackCommand("damage", "Kai Angel"));
 
             System.out.println(state);
         }

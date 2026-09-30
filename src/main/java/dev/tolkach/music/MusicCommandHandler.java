@@ -1,0 +1,43 @@
+package dev.tolkach.music;
+
+import dev.tolkach.music.commands.*;
+import dev.tolkach.yandex.model.PlaybackState;
+
+import java.util.Objects;
+
+public class MusicCommandHandler {
+
+    private final MusicController musicController;
+
+    public MusicCommandHandler(MusicController musicController) {
+        this.musicController = Objects.requireNonNull(musicController, "MusicController must not be null");
+    }
+
+    public PlaybackState handle(MusicCommand command) {
+        Objects.requireNonNull(command, "Command must not be null");
+
+        return switch (command) {
+            case PlayTrackCommand play -> musicController.playTrack(play.title(), play.artist());
+
+            case PauseCommand ignored -> {
+                musicController.pause();
+                yield musicController.getPlaybackState();
+            }
+
+            case ResumeCommand ignored -> {
+                musicController.resume();
+                yield musicController.getPlaybackState();
+            }
+
+            case NextCommand ignored -> {
+                musicController.next();
+                yield musicController.getPlaybackState();
+            }
+
+            case PreviousCommand ignored -> {
+                musicController.previous();
+                yield musicController.getPlaybackState();
+            }
+        };
+    }
+}
