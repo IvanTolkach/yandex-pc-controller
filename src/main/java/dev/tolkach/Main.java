@@ -6,10 +6,10 @@ import dev.tolkach.music.MusicCommandHandler;
 import dev.tolkach.music.MusicController;
 import dev.tolkach.music.YandexMusicController;
 import dev.tolkach.music.commands.*;
+import dev.tolkach.music.protocol.*;
 import dev.tolkach.yandex.YandexMusicClient;
 import dev.tolkach.yandex.YandexMusicPage;
 import dev.tolkach.yandex.matching.TrackMatcher;
-import dev.tolkach.yandex.model.PlaybackState;
 
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
@@ -28,17 +28,24 @@ public class Main {
 
             YandexMusicPage musicPage = new YandexMusicPage(page);
 
-            TrackMatcher trackMatcher = new TrackMatcher();
-
-            YandexMusicClient client = new YandexMusicClient(musicPage, trackMatcher);
+            YandexMusicClient client = new YandexMusicClient(musicPage, new TrackMatcher());
 
             MusicController musicController = new YandexMusicController(client);
 
             MusicCommandHandler commandHandler = new MusicCommandHandler(musicController);
 
-            PlaybackState state = commandHandler.handle(new PlayTrackCommand("damage", "Kai Angel"));
+            MusicCommandDispatcher dispatcher = new MusicCommandDispatcher(new MusicCommandMapper(), commandHandler);
 
-            System.out.println(state);
+            MusicCommandRequest request = new MusicCommandRequest(
+                    "test-001",
+                    MusicAction.PLAY_TRACK,
+                    "Damage",
+                    "Kai Angel"
+            );
+
+            MusicCommandResponse response = dispatcher.dispatch(request);
+
+            System.out.println(response);
         }
         catch (Exception e) {
             System.out.println("ERROR: " + e.getMessage());
