@@ -1,4 +1,4 @@
-package dev.tolkach.music.protocol;
+package dev.tolkach.protocol.music;
 
 public enum MusicAction {
     PLAY_TRACK,

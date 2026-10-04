@@ -1,6 +1,7 @@
 package dev.tolkach.music.protocol;
 
 import dev.tolkach.music.commands.*;
+import dev.tolkach.protocol.music.MusicCommandRequest;
 
 public class MusicCommandMapper {
     public MusicCommand map(MusicCommandRequest request) {

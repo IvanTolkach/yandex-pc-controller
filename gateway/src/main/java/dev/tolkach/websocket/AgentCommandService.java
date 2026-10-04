@@ -1,5 +1,7 @@
 package dev.tolkach.websocket;
 
+import dev.tolkach.protocol.music.MusicCommandRequest;
+import dev.tolkach.protocol.music.MusicCommandResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
@@ -20,58 +22,46 @@ public class AgentCommandService {
     private final AgentSessionRegistry registry;
     private final JsonMapper jsonMapper;
 
-    private final Map<String, CompletableFuture<String>> pendingResponses = new ConcurrentHashMap<>();
+    private final Map<String, CompletableFuture<MusicCommandResponse>> pendingResponses = new ConcurrentHashMap<>();
 
     public AgentCommandService(AgentSessionRegistry registry, JsonMapper jsonMapper) {
         this.registry = registry;
         this.jsonMapper = jsonMapper;
     }
 
-    public String sendCommand(String deviceId, String commandJson) throws Exception {
-        String requestId = extractRequestId(commandJson);
-
+    public MusicCommandResponse sendCommand(String deviceId, MusicCommandRequest request) throws Exception {
         WebSocketSession session = registry
                 .find(deviceId)
                 .orElseThrow(() -> new IllegalStateException("Agent is not connected: " + deviceId));
 
-        CompletableFuture<String> future = new CompletableFuture<>();
+        String requestId = request.requestId();
 
-        CompletableFuture<String> existing = pendingResponses.putIfAbsent(requestId, future);
+        CompletableFuture<MusicCommandResponse> future = new CompletableFuture<>();
+
+        CompletableFuture<MusicCommandResponse> existing = pendingResponses.putIfAbsent(requestId, future);
 
         if (existing != null) {
             throw  new IllegalArgumentException("Duplicate requestedId: " + requestId);
         }
 
         try {
-            System.out.println("Sending command to agent " + deviceId + ": " + commandJson);
+            String json = jsonMapper.writeValueAsString(request);
 
-            session.sendMessage(new TextMessage(commandJson));
+            session.sendMessage(new TextMessage(json));
 
-            String response = future.get(RESPONSE_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
-
-            System.out.println("Response from agent: " + response);
-
-            return response;
+            return future.get(RESPONSE_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
         }
         finally {
             pendingResponses.remove(requestId, future);
         }
     }
 
-    public void completeResponse(String responseJson) {
-        System.out.println("Completing response: " + responseJson);
+    public void completeResponse(MusicCommandResponse response) {
+        CompletableFuture<MusicCommandResponse> future = pendingResponses.get(response.requestId());
 
-        String requestId = extractRequestId(responseJson);
-
-        CompletableFuture<String> future = pendingResponses.get(requestId);
-
-        if (future == null) {
-            System.out.println("No pending request for requestId=" + requestId);
-
-            return;
+        if (future != null) {
+            future.complete(response);
         }
-
-        future.complete(responseJson);
     }
 
     private String extractRequestId(String json) {

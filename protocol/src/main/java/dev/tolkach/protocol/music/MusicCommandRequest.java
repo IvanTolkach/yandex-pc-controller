@@ -1,4 +1,4 @@
-package dev.tolkach.music.protocol;
+package dev.tolkach.protocol.music;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 

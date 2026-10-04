@@ -1,5 +1,4 @@
 plugins {
-    id 'application'
     id 'java'
 }
 
@@ -11,17 +10,11 @@ repositories {
 }
 
 dependencies {
-    implementation 'com.microsoft.playwright:playwright:1.58.0'
-    implementation 'tools.jackson.core:jackson-databind:3.1.5'
-    implementation project(':protocol')
+    implementation 'com.fasterxml.jackson.core:jackson-annotations:2.22'
 
     testImplementation platform('org.junit:junit-bom:6.0.0')
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-}
-
-application {
-    mainClass = 'dev.tolkach.Main'
 }
 
 java {

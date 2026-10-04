@@ -1,8 +1,8 @@
 package dev.tolkach.gateway.client;
 
 import dev.tolkach.music.protocol.MusicCommandDispatcher;
-import dev.tolkach.music.protocol.MusicCommandRequest;
-import dev.tolkach.music.protocol.MusicCommandResponse;
+import dev.tolkach.protocol.music.MusicCommandRequest;
+import dev.tolkach.protocol.music.MusicCommandResponse;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.net.URI;
@@ -81,8 +81,6 @@ public class GatewayClient implements AutoCloseable {
 
     private void handleCommand(String payload) {
         try {
-            System.out.println("Command received from gateway: " + payload);
-
             MusicCommandRequest request = jsonMapper.readValue(payload, MusicCommandRequest.class);
 
             System.out.println("Parsed command: " + request);
@@ -92,9 +90,7 @@ public class GatewayClient implements AutoCloseable {
             System.out.println("Command result: " + response);
 
             String responseJson = jsonMapper.writeValueAsString(response);
-
-            System.out.println("Sending response to gateway: " + responseJson);
-
+            
             WebSocket socket = webSocket;
 
             if (socket == null || !connected) {

@@ -13,6 +13,7 @@ repositories {
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web:4.1.1'
     implementation 'org.springframework.boot:spring-boot-starter-websocket:4.1.1'
+    implementation project(':protocol')
 
     testImplementation platform('org.junit:junit-bom:6.0.0')
     testImplementation 'org.junit.jupiter:junit-jupiter'

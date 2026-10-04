@@ -1,3 +1,4 @@
 rootProject.name = 'yandex-pc-controller'
 
 include 'gateway'
+include 'protocol'

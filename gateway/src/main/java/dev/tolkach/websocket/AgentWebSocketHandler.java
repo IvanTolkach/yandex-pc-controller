@@ -1,5 +1,6 @@
 package dev.tolkach.websocket;
 
+import dev.tolkach.protocol.music.MusicCommandResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -7,6 +8,7 @@ import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.net.URI;
 
@@ -17,10 +19,12 @@ public class AgentWebSocketHandler extends TextWebSocketHandler {
 
     private final AgentSessionRegistry registry;
     private final AgentCommandService commandService;
+    private final JsonMapper jsonMapper;
 
-    public AgentWebSocketHandler(AgentSessionRegistry registry, AgentCommandService commandService) {
+    public AgentWebSocketHandler(AgentSessionRegistry registry, AgentCommandService commandService, JsonMapper jsonMapper) {
         this.registry = registry;
         this.commandService = commandService;
+        this.jsonMapper = jsonMapper;
     }
 
     @Override
@@ -33,10 +37,15 @@ public class AgentWebSocketHandler extends TextWebSocketHandler {
     }
 
     @Override
-    protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
-        log.debug("Response from agent: sessionId={}, payload={}", session.getId(), message.getPayload());
+    protected void handleTextMessage(WebSocketSession session, TextMessage message) {
+        try {
+            MusicCommandResponse response = jsonMapper.readValue(message.getPayload(), MusicCommandResponse.class);
 
-        commandService.completeResponse(message.getPayload());
+            commandService.completeResponse(response);
+        }
+        catch (Exception exception) {
+            log.error("Failed to parse response from agent. sessionId={}", session.getId(), exception);
+        }
     }
 
     @Override
