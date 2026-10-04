@@ -5,24 +5,38 @@ import dev.tolkach.protocol.music.MusicCommandRequest;
 import dev.tolkach.protocol.music.MusicCommandResponse;
 import tools.jackson.databind.json.JsonMapper;
 
+import javax.management.relation.RoleList;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.WebSocket;
-import java.util.concurrent.CompletionStage;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.nio.ByteBuffer;
+import java.util.Map;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class GatewayClient implements AutoCloseable {
+
+    private static final long INITIAL_RECONNECT_DELAY_SECONDS = 1;
+    private static final long MAX_RECONNECT_DELAY_SECONDS = 30;
+    private static final long PING_INTERVAL_SECONDS = 15;
 
     private final HttpClient httpClient;
     private final URI uri;
     private final JsonMapper jsonMapper;
     private final MusicCommandDispatcher dispatcher;
+
     private final ExecutorService commandExecutor;
+    private final ScheduledExecutorService scheduler;
+
+    private final AtomicBoolean closing = new AtomicBoolean(false);
+    private final AtomicBoolean connecting = new AtomicBoolean(false);
+    private final AtomicBoolean reconnectScheduled = new AtomicBoolean(false);
+    private final AtomicInteger reconnectAttempt = new AtomicInteger(0);
 
     private volatile WebSocket webSocket;
     private volatile boolean connected;
+    private volatile ScheduledFuture<?> pingTask;
 
     public GatewayClient(String gatewayUri, String  deviceId, MusicCommandDispatcher dispatcher) {
         if (gatewayUri == null || gatewayUri.isBlank()) {
@@ -50,14 +64,19 @@ public class GatewayClient implements AutoCloseable {
                 .name("music-command-", 0)
                 .factory()
         );
+
+        this.scheduler = Executors.newSingleThreadScheduledExecutor(Thread.ofVirtual()
+                .name("gateway-scheduler-", 0)
+                .factory()
+        );
     }
 
     public void connect() {
-        webSocket = httpClient
-                .newWebSocketBuilder()
-                .buildAsync(uri, new Listener())
-                .orTimeout(10, TimeUnit.SECONDS)
-                .join();
+        if (closing.get()) {
+            throw new IllegalStateException("GatewayClient is closed");
+        }
+
+        connectInternal().join();
     }
 
     public boolean isConnected() {
@@ -66,9 +85,21 @@ public class GatewayClient implements AutoCloseable {
 
     @Override
     public void close() throws Exception {
+        if (!closing.compareAndSet(false, true)) {
+            return;
+        }
+
         connected = false;
 
+        ScheduledFuture<?> currentPingTask = pingTask;
+
+        if (currentPingTask != null) {
+            currentPingTask.cancel(false);
+        }
+
         WebSocket socket = webSocket;
+
+        webSocket = null;
 
         if (socket != null) {
             socket.sendClose(WebSocket.NORMAL_CLOSURE, "shutdown");
@@ -76,7 +107,86 @@ public class GatewayClient implements AutoCloseable {
 
         commandExecutor.shutdown();
 
-        webSocket = null;
+        scheduler.shutdown();
+
+        System.out.println("Gateway client stopped.");
+    }
+
+    private CompletableFuture<WebSocket> connectInternal() {
+        if (closing.get()) {
+            return CompletableFuture.failedFuture(new IllegalStateException("GatewayClient is closed"));
+        }
+
+        if (!connecting.compareAndSet(false, true)) {
+            return CompletableFuture.failedFuture(new IllegalStateException("Connection attempt already in progress"));
+        }
+
+        return httpClient
+                .newWebSocketBuilder()
+                .buildAsync(uri, new Listener())
+                .whenComplete(
+                        (socket, error) -> {
+                            connecting.set(false);
+                            if (error != null) {
+                                scheduleReconnect(error);
+                            }
+                        }
+                );
+    }
+
+    private void scheduleReconnect(Throwable cause) {
+        if (closing.get()) {
+            return;
+        }
+
+        if (!reconnectScheduled.compareAndSet(false, true)) {
+            return;
+        }
+
+        int attempt = reconnectAttempt.incrementAndGet();
+
+        long delay = calculateReconnectDelay(attempt);
+
+        System.out.println("Gateway connection lost. Reconnect attempt " + attempt + " in " + delay + " seconds.");
+
+        scheduler.schedule(() -> {
+            reconnectScheduled.set(false);
+
+            if (closing.get()) {
+                return;
+            }
+
+            connectInternal();
+        }, delay, TimeUnit.SECONDS);
+    }
+
+    private long calculateReconnectDelay(int attempt) {
+        long delay = INITIAL_RECONNECT_DELAY_SECONDS;
+
+        for (int i = 1; i < attempt; i++) {
+            delay = Math.min(delay * 2, MAX_RECONNECT_DELAY_SECONDS);
+        }
+
+        return Math.min(delay, MAX_RECONNECT_DELAY_SECONDS);
+    }
+
+    private void startPingTask(WebSocket socket) {
+        ScheduledFuture<?> oldTask = pingTask;
+
+        if (oldTask != null) {
+            oldTask.cancel(false);
+        }
+
+        pingTask = scheduler.scheduleAtFixedRate(() -> {
+            if (!connected || closing.get()) {
+                return;
+            }
+            try {
+                socket.sendPing(ByteBuffer.allocate(0));
+            } catch (Exception exception) {
+                System.err.println("Failed to send gateway ping: " + exception.getMessage());
+            }
+        }, PING_INTERVAL_SECONDS, PING_INTERVAL_SECONDS, TimeUnit.SECONDS);
     }
 
     private void handleCommand(String payload) {
@@ -90,7 +200,7 @@ public class GatewayClient implements AutoCloseable {
             System.out.println("Command result: " + response);
 
             String responseJson = jsonMapper.writeValueAsString(response);
-            
+
             WebSocket socket = webSocket;
 
             if (socket == null || !connected) {
@@ -104,25 +214,38 @@ public class GatewayClient implements AutoCloseable {
         }
     }
 
-
     private class Listener implements WebSocket.Listener {
 
         @Override
-        public void onOpen(WebSocket webSocket) {
+        public void onOpen(WebSocket socket) {
+            if (closing.get()) {
+                socket.sendClose(WebSocket.NORMAL_CLOSURE, "shutdown");
+
+                return;
+            }
+
+            webSocket = socket;
             connected = true;
+
+            reconnectAttempt.set(0);
 
             System.out.println("Gateway WebSocket connected.");
 
-            webSocket.request(1);
+            startPingTask(socket);
+
+            socket.request(1);
         }
 
         @Override
-        public CompletionStage<?> onText(WebSocket webSocket, CharSequence data, boolean last) {
-            String payload = data.toString();
+        public CompletionStage<?> onText(WebSocket socket, CharSequence data, boolean last) {
+            if (closing.get()) {
+                socket.request(1);
+                return null;
+            }
 
-            commandExecutor.submit(() -> handleCommand(payload));
+            commandExecutor.submit(() -> handleCommand(data.toString()));
 
-            webSocket.request(1);
+            socket.request(1);
 
             return null;
         }
@@ -131,16 +254,32 @@ public class GatewayClient implements AutoCloseable {
         public void onError(WebSocket webSocket, Throwable error) {
             connected = false;
 
-            error.printStackTrace();
+            System.err.println("Gateway WebSocket error: " + error.getMessage());
+
+            scheduleReconnect(error);
         }
 
         @Override
-        public CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
+        public CompletionStage<?> onClose(WebSocket socket, int statusCode, String reason) {
             connected = false;
 
-            System.out.println("Gateway disconnected: " + statusCode + " " + reason);
+            if (webSocket == socket) {
+                webSocket = null;
+            }
 
-            webSocket.request(1);
+            ScheduledFuture<?> currentPingTask = pingTask;
+
+            if (currentPingTask != null) {
+                currentPingTask.cancel(false);
+            }
+
+            System.out.println("Gateway WebSocket closed: " + statusCode + " " + reason);
+
+            if (!closing.get()) {
+                scheduleReconnect(new IllegalStateException("WebSocket closed"));
+            }
+
+            socket.request(1);
 
             return null;
         }
