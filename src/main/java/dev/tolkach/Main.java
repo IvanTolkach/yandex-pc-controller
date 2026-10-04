@@ -2,7 +2,7 @@ package dev.tolkach;
 
 import com.microsoft.playwright.Page;
 import dev.tolkach.browser.CdpBrowser;
-import dev.tolkach.music.MusicCommandHandler;
+import dev.tolkach.gateway.client.GatewayClient;
 import dev.tolkach.music.MusicController;
 import dev.tolkach.music.YandexMusicController;
 import dev.tolkach.music.commands.*;
@@ -36,16 +36,13 @@ public class Main {
 
             MusicCommandDispatcher dispatcher = new MusicCommandDispatcher(new MusicCommandMapper(), commandHandler);
 
-            MusicCommandRequest request = new MusicCommandRequest(
-                    "test-001",
-                    MusicAction.PLAY_TRACK,
-                    "Damage",
-                    "Kai Angel"
-            );
+            try (GatewayClient gatewayClient = new GatewayClient("ws://127.0.0.1:8080/ws/agent", "my-pc", dispatcher)) {
+                gatewayClient.connect();
 
-            MusicCommandResponse response = dispatcher.dispatch(request);
-
-            System.out.println(response);
+                System.out.println("Desktop agent is running.");
+                System.out.println("Press ENTER to shutdown.");
+                System.in.read();
+            }
         }
         catch (Exception e) {
             System.out.println("ERROR: " + e.getMessage());

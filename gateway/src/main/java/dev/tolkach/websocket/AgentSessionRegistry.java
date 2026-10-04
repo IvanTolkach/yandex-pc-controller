@@ -1,11 +1,13 @@
 package dev.tolkach.websocket;
 
+import org.springframework.stereotype.Component;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
+@Component
 public class AgentSessionRegistry {
 
     private final Map<String, WebSocketSession> sessions = new ConcurrentHashMap<>();

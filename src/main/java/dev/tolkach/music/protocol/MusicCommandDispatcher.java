@@ -29,11 +29,11 @@ public class MusicCommandDispatcher {
 
             PlaybackState state = commandHandler.handle(command);
 
-            return MusicCommandResponse.success(request.requersId(), state);
+            return MusicCommandResponse.success(request.requestId(), state);
         } catch (IllegalArgumentException exception) {
-            return MusicCommandResponse.failure(request.requersId(), "INVALID_COMMAND", exception.getMessage());
+            return MusicCommandResponse.failure(request.requestId(), "INVALID_COMMAND", exception.getMessage());
         } catch (IllegalStateException exception) {
-            return MusicCommandResponse.failure(request.requersId(), "PLAYER_ERROR", exception.getMessage());
+            return MusicCommandResponse.failure(request.requestId(), "PLAYER_ERROR", exception.getMessage());
         }
     }
 }
