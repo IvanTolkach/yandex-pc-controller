@@ -13,18 +13,28 @@ public class AliceWebhookController {
 
     private static final Logger log = LoggerFactory.getLogger(AliceWebhookController.class);
 
+    private final AliceMusicService musicService;
+
+    public AliceWebhookController(AliceMusicService musicService) {
+        this.musicService = musicService;
+    }
+
     @PostMapping("/webhook")
     public AliceResponse webhook(@RequestBody AliceRequest request) {
         String command = request.request() != null ? request.request().command() : null;
 
-        String originalUtterance = request.request() != null ? request.request().originalUtterance() : null;
-
-        log.info("Alice request: command='{}', original='{}'", command, originalUtterance);
+        log.info("Alice command: '{}'", command);
 
         if (command == null || command.isBlank()) {
-            return AliceResponse.text("Я не поняла команду.");
+            return AliceResponse.text("Я  не поняла команду.");
         }
 
-        return AliceResponse.text("Я услышала: " + command);
+        boolean accepted = musicService.handle(command);
+
+        if (!accepted) {
+            return AliceResponse.text("Пока я умею включать треки в формате: включи название исполнителя исполнитель.");
+        }
+
+        return AliceResponse.text("Включаю.");
     }
 }

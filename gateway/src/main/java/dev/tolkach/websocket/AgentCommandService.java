@@ -30,9 +30,11 @@ public class AgentCommandService {
     }
 
     public MusicCommandResponse sendCommand(String deviceId, MusicCommandRequest request) throws Exception {
-        WebSocketSession session = registry
-                .find(deviceId)
-                .orElseThrow(() -> new IllegalStateException("Agent is not connected: " + deviceId));
+        return sendCommandAsync(deviceId, request).get(RESPONSE_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+    }
+
+    public CompletableFuture<MusicCommandResponse> sendCommandAsync(String deviceId, MusicCommandRequest request) {
+        WebSocketSession session = registry.find(deviceId).orElseThrow(() -> new IllegalStateException("Agent is not connected: " + deviceId));
 
         String requestId = request.requestId();
 
@@ -41,7 +43,7 @@ public class AgentCommandService {
         CompletableFuture<MusicCommandResponse> existing = pendingResponses.putIfAbsent(requestId, future);
 
         if (existing != null) {
-            throw  new IllegalArgumentException("Duplicate requestedId: " + requestId);
+            throw new IllegalArgumentException("Duplicate requestId: " + requestId);
         }
 
         try {
@@ -49,10 +51,18 @@ public class AgentCommandService {
 
             session.sendMessage(new TextMessage(json));
 
-            return future.get(RESPONSE_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+            future.orTimeout(RESPONSE_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+
+            future.whenComplete((response, error) -> pendingResponses.remove(requestId, future));
+
+            return future;
         }
-        finally {
+        catch (Exception exception) {
             pendingResponses.remove(requestId, future);
+
+            future.completeExceptionally(exception);
+
+            return future;
         }
     }
 
