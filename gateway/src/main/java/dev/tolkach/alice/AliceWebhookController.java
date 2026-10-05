@@ -1,0 +1,30 @@
+package dev.tolkach.alice;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/alice")
+public class AliceWebhookController {
+
+    private static final Logger log = LoggerFactory.getLogger(AliceWebhookController.class);
+
+    @PostMapping("/webhook")
+    public AliceResponse webhook(@RequestBody AliceRequest request) {
+        String command = request.request() != null ? request.request().command() : null;
+
+        String originalUtterance = request.request() != null ? request.request().originalUtterance() : null;
+
+        log.info("Alice request: command='{}', original='{}'", command, originalUtterance);
+
+        if (command == null || command.isBlank()) {
+            return AliceResponse.text("Я не поняла команду.");
+        }
+
+        return AliceResponse.text("Я услышала: " + command);
+    }
+}
