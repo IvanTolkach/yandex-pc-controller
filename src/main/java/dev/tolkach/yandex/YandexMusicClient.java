@@ -130,6 +130,14 @@ public class YandexMusicClient {
         playerBar.previous();
     }
 
+    public void volumeUp() {
+        playerBar.volumeUp();
+    }
+
+    public void volumeDown() {
+        playerBar.volumeDown();
+    }
+
     private String buildSearchQuery(String title, String artist) {
         return (title.trim() + " " + artist.trim()).trim();
     }
@@ -142,9 +150,5 @@ public class YandexMusicClient {
         if (artist == null || artist.isBlank()) {
             throw new IllegalArgumentException("Artist must not be empty");
         }
-    }
-
-    public String getCurrentAlbumId() {
-        return playerBar.getCurrentAlbumId();
     }
 }

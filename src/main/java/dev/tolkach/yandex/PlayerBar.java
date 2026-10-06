@@ -26,6 +26,8 @@ public class PlayerBar {
 
     private static final Duration PREVIOUS_TRACK_ACTION_TIMEOUT = Duration.ofSeconds(2);
 
+    private static final double VOLUME_STEP = 0.10;
+
     private final Page page;
 
     public PlayerBar(Page page) {
@@ -198,6 +200,14 @@ public class PlayerBar {
         }
     }
 
+    public void volumeUp() {
+        changeVolume(VOLUME_STEP);
+    }
+
+    public void volumeDown() {
+        changeVolume(-VOLUME_STEP);
+    }
+
     private Locator getPlayerBar() {
         Locator playerBar = page.getByTestId(PLAYERBAR_TEST_ID);
 
@@ -265,5 +275,50 @@ public class PlayerBar {
         }
 
         return false;
+    }
+
+    private void changeVolume(double delta) {
+        Locator volumeSlider = getPlayerBar().getByTestId("CHANGE_VOLUME_SLIDER");
+
+        String value = volumeSlider.getAttribute("value");
+
+        if (value == null || value.isBlank()) {
+            throw new IllegalStateException("Volume slider value is missing");
+        }
+
+        double currentVolume;
+
+        try {
+            currentVolume = Double.parseDouble(value);
+        }
+        catch (NumberFormatException exception) {
+            throw new IllegalStateException("Invalid volume value: " + value, exception);
+        }
+
+        double newVolume = Math.max(0.0, Math.min(1.0, currentVolume + delta));
+
+        if (Double.compare(currentVolume, newVolume) == 0) {
+            return;
+        }
+
+        setVolume(volumeSlider, newVolume);
+    }
+
+    private void setVolume(Locator volumeSlider, double targetVolume) {
+        double currentVolume = Double.parseDouble(volumeSlider.getAttribute("value"));
+
+        int steps = (int) Math.round(Math.abs(targetVolume - currentVolume) / 0.01);
+
+        if (steps == 0) {
+            return;
+        }
+
+        volumeSlider.focus();
+
+        String key = targetVolume > currentVolume ? "ArrowUp" : "ArrowDown";
+
+        for (int i = 0; i < steps; i++) {
+            volumeSlider.press(key);
+        }
     }
 }

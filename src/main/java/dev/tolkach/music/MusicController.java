@@ -19,4 +19,8 @@ public interface MusicController {
     void next();
 
     void previous();
+
+    void volumeUp();
+
+    void volumeDown();
 }

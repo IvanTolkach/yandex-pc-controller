@@ -7,5 +7,7 @@ public enum MusicAction {
     PAUSE,
     RESUME,
     NEXT,
-    PREVIOUS
+    PREVIOUS,
+    VOLUME_UP,
+    VOLUME_DOWN
 }

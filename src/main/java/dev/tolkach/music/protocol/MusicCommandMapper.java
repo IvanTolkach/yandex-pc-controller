@@ -20,6 +20,10 @@ public class MusicCommandMapper {
             case NEXT -> new NextCommand();
 
             case PREVIOUS -> new PreviousCommand();
+
+            case VOLUME_UP -> new VolumeUpCommand();
+
+            case VOLUME_DOWN -> new VolumeDownCommand();
         };
     }
 }

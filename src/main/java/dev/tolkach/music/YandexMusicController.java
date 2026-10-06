@@ -54,4 +54,14 @@ public class YandexMusicController implements MusicController {
     public void previous() {
         client.previous();
     }
+
+    @Override
+    public void volumeUp() {
+        client.volumeUp();
+    }
+
+    @Override
+    public void volumeDown() {
+        client.volumeDown();
+    }
 }

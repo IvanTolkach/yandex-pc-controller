@@ -24,6 +24,10 @@ public class AliceMusicCommandParser {
 
     private static final Pattern PREVIOUS_PATTERN = Pattern.compile("^(назад|предыдущий|предыдущий\\s+трек|включи\\s+предыдущий).*", Pattern.CASE_INSENSITIVE);
 
+    private static final Pattern VOLUME_UP_PATTERN = Pattern.compile("^(?:громче|сделай громче|прибавь громкость).*", Pattern.CASE_INSENSITIVE);
+
+    private static final Pattern VOLUME_DOWN_PATTERN = Pattern.compile("^(?:тише|сделай тише|убавь громкость).*", Pattern.CASE_INSENSITIVE);
+
     public Optional<MusicCommandRequest> parse(String command) {
         if (command == null || command.isBlank()) {
             return Optional.empty();
@@ -45,6 +49,14 @@ public class AliceMusicCommandParser {
 
         if (PREVIOUS_PATTERN.matcher(normalized).matches()) {
             return Optional.of(command(MusicAction.PREVIOUS));
+        }
+
+        if (VOLUME_UP_PATTERN.matcher(normalized).matches()) {
+            return Optional.of(command(MusicAction.VOLUME_UP));
+        }
+
+        if (VOLUME_DOWN_PATTERN.matcher(normalized).matches()) {
+            return Optional.of(command(MusicAction.VOLUME_DOWN));
         }
 
         Optional<MusicCommandRequest> album = parsePlayAlbum(normalized);

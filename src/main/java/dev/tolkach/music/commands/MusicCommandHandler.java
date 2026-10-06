@@ -42,6 +42,16 @@ public class MusicCommandHandler {
                 musicController.previous();
                 yield musicController.getPlaybackState();
             }
+
+            case VolumeUpCommand ignored -> {
+                musicController.volumeUp();
+                yield musicController.getPlaybackState();
+            }
+
+            case VolumeDownCommand ignored -> {
+                musicController.volumeDown();
+                yield musicController.getPlaybackState();
+            }
         };
     }
 }
