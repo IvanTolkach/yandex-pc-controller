@@ -6,6 +6,10 @@ public interface MusicController {
 
     PlaybackState playTrack(String title, String artist);
 
+    PlaybackState playQuery(String query);
+
+    PlaybackState playAlbum(String title, String artist);
+
     PlaybackState getPlaybackState();
 
     void pause();

@@ -13,16 +13,14 @@ public record MusicCommandRequest(
         String title,
 
         @JsonProperty("artist")
-        String artist
+        String artist,
+
+        @JsonProperty("query")
+        String query
 ) {
     public MusicCommandRequest {
-        if (requestId == null || requestId.isBlank()) {
-            throw  new IllegalArgumentException("Request id must not be empty");
-        }
-
-        if (action == null) {
-            throw  new IllegalArgumentException("Action id must not null");
-        }
+        validateRequestId(requestId);
+        validateAction(action);
 
         requestId = requestId.trim();
 
@@ -32,6 +30,46 @@ public record MusicCommandRequest(
 
         if (artist != null) {
             artist = artist.trim();
+        }
+
+        if (query != null) {
+            query = query.trim();
+        }
+
+        validatePayload(action, title, query);
+    }
+
+    private static void validateRequestId(String requestId) {
+        if (requestId == null || requestId.isBlank()) {
+            throw  new IllegalArgumentException("Request id must not be empty");
+        }
+    }
+
+    private static void validateAction(MusicAction action) {
+        if (action == null) {
+            throw new IllegalArgumentException("Action must not be null");
+        }
+    }
+
+    private void validatePayload(MusicAction action, String title, String query) {
+        switch (action) {
+            case PLAY_TRACK, PLAY_ALBUM -> requireTitle(title);
+
+            case PLAY_QUERY -> requireQuery(query);
+
+            case PAUSE, RESUME, NEXT, PREVIOUS -> { }
+        }
+    }
+
+    private void requireTitle(String title) {
+        if (title == null || title.isBlank()) {
+            throw new IllegalArgumentException("Title must not be empty");
+        }
+    }
+
+    private void requireQuery(String query) {
+        if (query == null || query.isBlank()) {
+            throw new IllegalArgumentException("Search query must not be empty");
         }
     }
 }

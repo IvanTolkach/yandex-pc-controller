@@ -95,6 +95,55 @@ public class PlayerBar {
         return state;
     }
 
+    public PlaybackState waitUntilPlayingFromAlbum(String expectedAlbumId, Duration timeout) {
+        Locator playerBar = getPlayerBar();
+
+        long deadline = System.nanoTime() + timeout.toNanos();
+
+        while (System.nanoTime() < deadline) {
+            Locator titleLink = playerBar.getByTestId(TRACK_TITLE_TEST_ID);
+
+            if (titleLink.count() > 0 && titleLink.first().isVisible()) {
+                String href = titleLink.first().getAttribute("href");
+
+                if (href != null && !href.isBlank()) {
+                    String actualAlbumId = extractQueryParameter(href, "albumId");
+
+                    boolean playing = isPlaying(playerBar);
+
+                    if (expectedAlbumId.equals(actualAlbumId) && playing) {
+                        return getState();
+                    }
+                }
+            }
+
+            page.waitForTimeout(100);
+        }
+
+        PlaybackState state = getState();
+
+        throw new IllegalStateException("Album playback was not verified. " +
+                        "Expected albumId=" +
+                        expectedAlbumId +
+                        ", actual state=" +
+                        state
+        );
+    }
+
+    public String getCurrentAlbumId() {
+        Locator playerBar = getPlayerBar();
+
+        Locator titleLink = playerBar.getByTestId(TRACK_TITLE_TEST_ID);
+
+        String href = titleLink.getAttribute("href");
+
+        if (href == null || href.isBlank()) {
+            throw new IllegalStateException("Current track href is missing");
+        }
+
+        return extractQueryParameter(href, "albumId");
+    }
+
     public boolean isPlaying() {
         return isPlaying(getPlayerBar());
     }

@@ -19,6 +19,10 @@ public class MusicCommandHandler {
         return switch (command) {
             case PlayTrackCommand play -> musicController.playTrack(play.title(), play.artist());
 
+            case PlayQueryCommand query -> musicController.playQuery(query.query());
+
+            case PlayAlbumCommand album -> musicController.playAlbum(album.title(), album.artist());
+
             case PauseCommand ignored -> {
                 musicController.pause();
                 yield musicController.getPlaybackState();

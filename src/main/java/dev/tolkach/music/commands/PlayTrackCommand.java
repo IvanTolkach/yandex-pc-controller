@@ -1,21 +1,24 @@
 package dev.tolkach.music.commands;
 
+import java.util.Objects;
+
 public record PlayTrackCommand(String title, String artist) implements MusicCommand {
 
     public PlayTrackCommand {
-        if (title == null || title.isBlank()) {
-            throw new IllegalArgumentException(
-                    "Track title must not be empty"
-            );
-        }
+        Objects.requireNonNull(title, "Track title must not be null");
 
-        if (artist == null || artist.isBlank()) {
-            throw new IllegalArgumentException(
-                    "Artist must not be empty"
-            );
+        if (title.isBlank()) {
+            throw new IllegalArgumentException("Track title must not be null");
         }
 
         title = title.trim();
-        artist = artist.trim();
+
+        if (artist != null) {
+            artist = artist.trim();
+
+            if (artist.isBlank()) {
+                artist = null;
+            }
+        }
     }
 }

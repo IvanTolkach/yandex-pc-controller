@@ -21,6 +21,16 @@ public class YandexMusicController implements MusicController {
     }
 
     @Override
+    public PlaybackState playQuery(String query) {
+        return client.playQuery(query);
+    }
+
+    @Override
+    public PlaybackState playAlbum(String title, String artist) {
+        return client.playAlbum(title, artist);
+    }
+
+    @Override
     public PlaybackState getPlaybackState() {
         return client.getPlaybackState();
     }

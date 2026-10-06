@@ -4,13 +4,14 @@ import dev.tolkach.music.commands.*;
 import dev.tolkach.protocol.music.MusicCommandRequest;
 
 public class MusicCommandMapper {
-    public MusicCommand map(MusicCommandRequest request) {
-        if (request == null) {
-            throw new IllegalArgumentException("Request must not be null");
-        }
 
+    public MusicCommand map(MusicCommandRequest request) {
         return switch (request.action()) {
-            case PLAY_TRACK -> mapPlayTrack(request);
+            case PLAY_TRACK -> new PlayTrackCommand(request.title(), request.artist());
+
+            case PLAY_QUERY -> new PlayQueryCommand(request.query());
+
+            case PLAY_ALBUM -> new PlayAlbumCommand(request.title(), request.query());
 
             case PAUSE -> new PauseCommand();
 
@@ -20,17 +21,5 @@ public class MusicCommandMapper {
 
             case PREVIOUS -> new PreviousCommand();
         };
-    }
-
-    private MusicCommand mapPlayTrack(MusicCommandRequest request) {
-        if (request.title() == null || request.title().isBlank()) {
-            throw new IllegalArgumentException("Title is requested for PLAY_TRACK");
-        }
-
-        if (request.artist() == null || request.artist().isBlank()) {
-            throw new IllegalArgumentException("Artist is requested for PLAY_TRACK");
-        }
-
-        return new PlayTrackCommand(request.title(), request.artist());
     }
 }

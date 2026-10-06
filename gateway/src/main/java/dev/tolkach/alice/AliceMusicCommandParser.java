@@ -14,6 +14,8 @@ public class AliceMusicCommandParser {
 
     private static final Pattern PLAY_TRACK_PATTERN = Pattern.compile("^включи\\s+(.+?)\\s+исполнителя\\s+(.+)$", Pattern.CASE_INSENSITIVE);
 
+    private static final Pattern PLAY_ALBUM_PATTERN = Pattern.compile("^(?:включи|поставь|запусти)\\s+альбом\\s+(.+?)(?:\\s+исполнителя\\s+(.+))?$", Pattern.CASE_INSENSITIVE);
+
     private static final Pattern PAUSE_PATTERN = Pattern.compile("^(поставь\\s+на\\s+паузу|пауза|останови|приостанови|стоп|хватит).*", Pattern.CASE_INSENSITIVE);
 
     private static final Pattern RESUME_PATTERN = Pattern.compile("^(продолжи|возобнови|воспроизведи).*", Pattern.CASE_INSENSITIVE);
@@ -45,17 +47,51 @@ public class AliceMusicCommandParser {
             return Optional.of(command(MusicAction.PREVIOUS));
         }
 
-        return parsePlayTrack(normalized);
+        Optional<MusicCommandRequest> album = parsePlayAlbum(normalized);
+
+        if (album.isPresent()) {
+            return album;
+        }
+
+        Optional<MusicCommandRequest> track = parsePlayTrack(normalized);
+
+        if (track.isPresent()) {
+            return track;
+        }
+
+        return parsePlayQuery(normalized);
     }
 
-    private Optional<MusicCommandRequest> parsePlayTrack(String command) {
-        if (command == null || command.isBlank()) {
+    private Optional<MusicCommandRequest> parsePlayAlbum(String command) {
+        Matcher matcher = PLAY_ALBUM_PATTERN.matcher(command);
+
+        if (!matcher.matches()) {
             return Optional.empty();
         }
 
-        String normalized = command.trim();
+        String title = matcher.group(1).trim();
 
-        Matcher matcher = PLAY_TRACK_PATTERN.matcher(normalized);
+        String artist = matcher.group(2);
+
+        if (artist != null) {
+            artist = artist.trim();
+
+            if (artist.isBlank()) {
+                artist = null;
+            }
+        }
+
+        return Optional.of(new MusicCommandRequest(
+                UUID.randomUUID().toString(),
+                MusicAction.PLAY_ALBUM,
+                title,
+                artist,
+                null)
+        );
+    }
+
+    private Optional<MusicCommandRequest> parsePlayTrack(String command) {
+        Matcher matcher = PLAY_TRACK_PATTERN.matcher(command);
 
         if (!matcher.matches()) {
             return  Optional.empty();
@@ -69,11 +105,50 @@ public class AliceMusicCommandParser {
                 UUID.randomUUID().toString(),
                 MusicAction.PLAY_TRACK,
                 title,
-                artist)
+                artist,
+                null)
         );
     }
 
+    private Optional<MusicCommandRequest> parsePlayQuery(String command) {
+        String query = extractPlayQuery(command);
+
+        if (query == null) {
+            return Optional.empty();
+        }
+
+        return Optional.of(new MusicCommandRequest(
+                UUID.randomUUID().toString(),
+                MusicAction.PLAY_QUERY,
+                null,
+                null,
+                query)
+        );
+    }
+
+    private String extractPlayQuery(String command) {
+        String[] prefixes = {"включи ", "поставь ", "запусти "};
+
+        for (String prefix : prefixes) {
+            if (command.toLowerCase().startsWith(prefix)) {
+                String query = command.substring(prefix.length()).trim();
+
+                if (!query.isBlank()) {
+                    return query;
+                }
+            }
+        }
+
+        return null;
+    }
+
     private MusicCommandRequest command(MusicAction action) {
-        return new MusicCommandRequest(UUID.randomUUID().toString(), action, null, null);
+        return new MusicCommandRequest(
+                UUID.randomUUID().toString(),
+                action,
+                null,
+                null,
+                null
+        );
     }
 }

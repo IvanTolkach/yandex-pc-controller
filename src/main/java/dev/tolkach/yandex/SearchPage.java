@@ -3,11 +3,14 @@ package dev.tolkach.yandex;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.options.WaitForSelectorState;
+import dev.tolkach.yandex.model.AlbumSearchResult;
 import dev.tolkach.yandex.model.TrackSearchResult;
 
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 public class SearchPage {
 
@@ -22,6 +25,11 @@ public class SearchPage {
     private static final String TRACK_DURATION_TEST_ID = "TRACK_DURATION";
 
     private static final String PLAY_BUTTON_TEST_ID = "PLAY_BUTTON";
+
+    private static final String ALBUM_CONTAINER_SELECTOR = "[data-test-id='ALBUM_ITEM'], " +
+            "[data-test-id='HORIZONTAL_ALBUM_CARD']";
+
+    private static final String ALBUM_TITLE_LINK_TEST_ID = "ALBUM_TITLE_LINK";
 
     private final Page page;
 
@@ -84,6 +92,80 @@ public class SearchPage {
         Locator playButton = card.getByTestId(PLAY_BUTTON_TEST_ID);
 
         playButton.click();
+    }
+
+    public List<AlbumSearchResult> getAlbumResults() {
+        Locator albumLinks = page.locator("a[href*='/album?albumId=']");
+
+        albumLinks.first().waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(10000));
+
+        int count = albumLinks.count();
+
+        Map<String, AlbumSearchResult> uniqueAlbums = new LinkedHashMap<>();
+
+        for (int i = 0; i < count; i++) {
+            Locator link = albumLinks.nth(i);
+
+            String href = link.getAttribute("href");
+
+            if (href == null || href.isBlank()) {
+                continue;
+            }
+
+            String albumId = extractQueryParameter(href, "albumId");
+
+            String title = link.innerText().trim();
+
+            if (title.isBlank()) {
+                continue;
+            }
+
+            uniqueAlbums.putIfAbsent(albumId, new AlbumSearchResult(title, albumId));
+        }
+
+        return List.copyOf(uniqueAlbums.values());
+    }
+
+    public void playAlbum(AlbumSearchResult album) {
+        Locator containers = page.locator(ALBUM_CONTAINER_SELECTOR);
+
+        for (int i = 0; i < containers.count(); i++) {
+            Locator container = containers.nth(i);
+
+            Locator albumLink = container.locator("a[href*='/album?albumId=']");
+
+            if (albumLink.count() == 0) {
+                continue;
+            }
+
+            String href = albumLink.first().getAttribute("href");
+
+            if (href == null) {
+                continue;
+            }
+
+            String albumId = extractQueryParameter(href, "albumId");
+
+            if (!album.albumId().equals(albumId)) {
+                continue;
+            }
+
+            Locator playButton = container.getByTestId(PLAY_BUTTON_TEST_ID);
+
+            if (playButton.count() == 0) {
+                continue;
+            }
+
+            if (!playButton.first().isEnabled()) {
+                throw new IllegalStateException("Album play button is disabled: " + album);
+            }
+
+            playButton.first().click();
+
+            return;
+        }
+
+        throw new IllegalStateException("Album container not found: " + album);
     }
 
     private void waitForTrackResult() {
@@ -156,6 +238,22 @@ public class SearchPage {
             }
         }
         throw new IllegalArgumentException("Parameter '" + parameter + "' not found in: " + href);
+    }
+
+    private AlbumSearchResult readAlbum(Locator albumItem) {
+        Locator titleLink = albumItem.getByTestId(ALBUM_TITLE_LINK_TEST_ID);
+
+        String title = titleLink.innerText().trim();
+
+        String href = titleLink.getAttribute("href");
+
+        if (href == null || href.isBlank()) {
+            throw new IllegalStateException("Album href is missing for: " + title);
+        }
+
+        String albumId = extractQueryParameter(href, "albumId");
+
+        return new AlbumSearchResult(title, albumId);
     }
 
     public Page page() {

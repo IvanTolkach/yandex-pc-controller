@@ -1,6 +1,8 @@
 package dev.tolkach.yandex;
 
+import dev.tolkach.yandex.matching.AlbumMatcher;
 import dev.tolkach.yandex.matching.TrackMatcher;
+import dev.tolkach.yandex.model.AlbumSearchResult;
 import dev.tolkach.yandex.model.PlaybackState;
 import dev.tolkach.yandex.model.TrackSearchResult;
 
@@ -12,9 +14,10 @@ public class YandexMusicClient {
     private static final Duration PLAYBACK_VERIFICATION_TIMEOUT = Duration.ofSeconds(10);
     private final YandexMusicPage musicPage;
     private final TrackMatcher trackMatcher;
+    private final AlbumMatcher albumMatcher;
     private final PlayerBar playerBar;
 
-    public YandexMusicClient(YandexMusicPage musicPage, TrackMatcher trackMatcher) {
+    public YandexMusicClient(YandexMusicPage musicPage, TrackMatcher trackMatcher, AlbumMatcher albumMatcher) {
         if (musicPage == null) {
             throw new IllegalArgumentException("musicPage must not be null");
         }
@@ -25,13 +28,14 @@ public class YandexMusicClient {
 
         this.musicPage = musicPage;
         this.trackMatcher = trackMatcher;
+        this.albumMatcher = albumMatcher;
         this.playerBar = musicPage.playerBar();
     }
 
     public PlaybackState playTrack(String title, String artist) {
         validateTrackRequest(title, artist);
 
-        String query = buildSearchQuery(title, artist);
+        String query = artist == null ? title : title + " " + artist;
 
         SearchPage searchPage = musicPage.openSearch();
 
@@ -40,15 +44,70 @@ public class YandexMusicClient {
         List<TrackSearchResult> results = searchPage.getTrackResults();
 
         if (results.isEmpty()) {
-            throw new IllegalStateException("No track results found for query: " + query);
+            throw new IllegalStateException("No tracks found for query: " + query);
         }
 
-        TrackSearchResult selected = trackMatcher.findBestMatch(results, title, artist)
-                .orElseThrow(() -> new IllegalStateException("Track not found: " + title + " - " + artist));
+        TrackSearchResult selected;
+
+        if (artist == null) {
+            selected = results.getFirst();
+        }
+        else {
+            selected = trackMatcher.findBestMatch(results, title, artist)
+                    .orElseThrow(() -> new IllegalStateException("Track not found: " + title + " - " + artist));
+        }
 
         searchPage.playTrack(selected);
 
         return playerBar.waitUntilPlaying(selected.trackId(), PLAYBACK_VERIFICATION_TIMEOUT);
+    }
+
+    public PlaybackState playQuery(String query) {
+        if (query == null || query.isBlank()) {
+            throw new IllegalArgumentException("Search query must not be empty");
+        }
+
+        SearchPage searchPage = musicPage.openSearch();
+
+        searchPage.search(query);
+
+        List<TrackSearchResult> results = searchPage.getTrackResults();
+
+        if (results.isEmpty()) {
+            throw new IllegalStateException("No tracks found for query: " + query);
+        }
+
+        TrackSearchResult selected = results.getFirst();
+
+        searchPage.playTrack(selected);
+
+        return playerBar.waitUntilPlaying(selected.trackId(), PLAYBACK_VERIFICATION_TIMEOUT);
+    }
+
+    public PlaybackState playAlbum(String title, String artist) {
+        if (title == null || title.isBlank()) {
+            throw new IllegalArgumentException("Album title must not be empty");
+        }
+
+        String query = artist == null || artist.isBlank() ? title.trim() : (title.trim() + " " + artist.trim());
+
+        SearchPage searchPage = musicPage.openSearch();
+
+        searchPage.search(query);
+
+        List<AlbumSearchResult> results = searchPage.getAlbumResults();
+
+        if (results.isEmpty()) {
+            throw new IllegalStateException("No albums found for query: " + query);
+        }
+
+        AlbumSearchResult selected = albumMatcher
+                .findBestMatch(results, title)
+                .orElseThrow(() -> new IllegalStateException("Album not found: " + title));
+
+        searchPage.playAlbum(selected);
+
+        return playerBar.waitUntilPlayingFromAlbum(selected.albumId(), PLAYBACK_VERIFICATION_TIMEOUT);
     }
 
     public PlaybackState getPlaybackState() {
@@ -83,5 +142,9 @@ public class YandexMusicClient {
         if (artist == null || artist.isBlank()) {
             throw new IllegalArgumentException("Artist must not be empty");
         }
+    }
+
+    public String getCurrentAlbumId() {
+        return playerBar.getCurrentAlbumId();
     }
 }
