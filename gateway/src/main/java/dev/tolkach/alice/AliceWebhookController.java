@@ -21,20 +21,14 @@ public class AliceWebhookController {
 
     @PostMapping("/webhook")
     public AliceResponse webhook(@RequestBody AliceRequest request) {
-        String command = request.request() != null ? request.request().command() : null;
+        log.info("Alice request: '{}'", request);
 
-        log.info("Alice command: '{}'", command);
-
-        if (command == null || command.isBlank()) {
-            return AliceResponse.text("Я  не поняла команду.");
-        }
-
-        boolean accepted = musicService.handle(command);
+        boolean accepted = musicService.handle(request);
 
         if (!accepted) {
-            return AliceResponse.text("Пока я умею включать треки в формате: включи название исполнителя исполнитель.");
+            return AliceResponse.text("Я не поняла команду.");
         }
 
-        return AliceResponse.text("Включаю.");
+        return AliceResponse.text("Выполняю.");
     }
 }

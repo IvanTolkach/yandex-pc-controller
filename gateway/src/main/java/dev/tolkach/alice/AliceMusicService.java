@@ -6,6 +6,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.util.Optional;
+
 @Service
 public class AliceMusicService {
 
@@ -19,14 +21,14 @@ public class AliceMusicService {
         this.commandService = commandService;
     }
 
-    public boolean handle(String command) {
-        var request = parser.parse(command);
+    public boolean handle(AliceRequest request) {
+        Optional<MusicCommandRequest> parsed = parser.parse(request);
 
-        if (request.isEmpty()) {
+        if (parsed.isEmpty()) {
             return false;
         }
 
-        MusicCommandRequest musicRequest = request.get();
+        MusicCommandRequest musicRequest = parsed.get();
 
         commandService.sendCommandAsync("my-pc", musicRequest)
                 .whenComplete((response, error) -> {
