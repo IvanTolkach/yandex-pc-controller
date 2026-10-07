@@ -97,6 +97,28 @@ public class PlayerBar {
         return state;
     }
 
+    public PlaybackState waitUntilPlaying(Duration timeout) {
+        long deadline = System.nanoTime() + timeout.toNanos();
+
+        while (System.nanoTime() < deadline) {
+            try {
+                PlaybackState state = getState();
+
+                if (state != null && state.playing()) {
+                    return state;
+                }
+            }
+            catch (Exception ignored) {
+            }
+
+            page.waitForTimeout(100);
+        }
+
+        PlaybackState state = getState();
+
+        throw new IllegalStateException("Playback did not start. " + "Current state: " + state);
+    }
+
     public PlaybackState waitUntilPlayingFromAlbum(String expectedAlbumId, Duration timeout) {
         Locator playerBar = getPlayerBar();
 

@@ -168,6 +168,47 @@ public class SearchPage {
         throw new IllegalStateException("Album container not found: " + album);
     }
 
+    public void playTopResult() {
+        Locator bestResults = page.getByTestId("SEARCH_BEST_RESULTS");
+
+        bestResults.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(10_000));
+
+        Locator playButtons = bestResults.getByTestId(PLAY_BUTTON_TEST_ID);
+
+        for (int i = 0; i < playButtons.count(); i++) {
+            Locator button = playButtons.nth(i);
+
+            if (!button.isVisible()) {
+                continue;
+            }
+
+            if (!button.isEnabled()) {
+                continue;
+            }
+
+            button.click();
+
+            return;
+        }
+
+        Locator tracks = page.getByTestId(TRACK_CARD_TEST_ID);
+
+        if (tracks.count() > 0) {
+            Locator firstTrack = tracks.first();
+
+            Locator playButton = firstTrack.getByTestId(PLAY_BUTTON_TEST_ID);
+
+            if (playButton.count() > 0 && playButton.first().isVisible() && playButton.first().isEnabled()) {
+
+                playButton.first().click();
+
+                return;
+            }
+        }
+
+        throw new IllegalStateException("No playable search result found");
+    }
+
     private void waitForTrackResult() {
         Locator cards = page.getByTestId(TRACK_CARD_TEST_ID);
 

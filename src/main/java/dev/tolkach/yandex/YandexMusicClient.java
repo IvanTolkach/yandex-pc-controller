@@ -69,19 +69,11 @@ public class YandexMusicClient {
 
         SearchPage searchPage = musicPage.openSearch();
 
-        searchPage.search(query);
+       searchPage.search(query.trim());
 
-        List<TrackSearchResult> results = searchPage.getTrackResults();
+       searchPage.playTopResult();
 
-        if (results.isEmpty()) {
-            throw new IllegalStateException("No tracks found for query: " + query);
-        }
-
-        TrackSearchResult selected = results.getFirst();
-
-        searchPage.playTrack(selected);
-
-        return playerBar.waitUntilPlaying(selected.trackId(), PLAYBACK_VERIFICATION_TIMEOUT);
+       return playerBar.waitUntilPlaying(PLAYBACK_VERIFICATION_TIMEOUT);
     }
 
     public PlaybackState playAlbum(String title, String artist) {
