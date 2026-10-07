@@ -20,6 +20,8 @@ public class PlayerBar {
 
     private static final String PLAY_BUTTON_TEST_ID = "PLAY_BUTTON";
 
+    private static final String NEXT_TRACK_TEST_ID = "NEXT_TRACK_BUTTON";
+
     private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(10);
 
     private static final double PREVIOUS_TRACK_START_THRESHOLD_SECONDS = 3.0;
@@ -197,9 +199,17 @@ public class PlayerBar {
     }
 
     public void next() {
-        Locator playerBar = getPlayerBar();
+        PlaybackState before = getState();
 
-        playerBar.getByTestId("NEXT_TRACK_BUTTON").click();
+        Locator nextButton = getPlayerBar().getByTestId(NEXT_TRACK_TEST_ID);
+
+        if (!nextButton.isEnabled()) {
+            return;
+        }
+
+        nextButton.click();
+
+        waitUntilTrackChangedAndPlaying(before.trackId(), Duration.ofSeconds(10));
     }
 
     public void previous() {
@@ -342,5 +352,32 @@ public class PlayerBar {
         for (int i = 0; i < steps; i++) {
             volumeSlider.press(key);
         }
+    }
+
+    private PlaybackState waitUntilTrackChangedAndPlaying(String previousTrackId, Duration timeout) {
+        long deadline = System.nanoTime() + timeout.toNanos();
+
+        boolean resumeAttempts = false;
+
+        while (System.nanoTime() < deadline) {
+            PlaybackState state = getState();
+
+            boolean trackChanged = state.trackId() != null && !state.trackId().equals(previousTrackId);
+
+            if (trackChanged && state.playing()) {
+                return state;
+            }
+
+            if (trackChanged && !state.playing() && !resumeAttempts) {
+                resume();
+                resumeAttempts = true;
+            }
+
+            page.waitForTimeout(100);
+        }
+
+        PlaybackState state = getState();
+
+        throw new IllegalStateException("Next track did not start playing. Previous trackId=" + previousTrackId + ", current state=" + state);
     }
 }

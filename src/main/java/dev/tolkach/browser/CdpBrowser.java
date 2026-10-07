@@ -24,7 +24,7 @@ public class CdpBrowser implements AutoCloseable{
 
         Browser browser = playwright.chromium().connectOverCDP(cdpUrl,
                 new BrowserType.ConnectOverCDPOptions().setNoDefaults(true).setIsLocal(true)
-        );
+         );
 
         return new CdpBrowser(playwright, browser);
     }

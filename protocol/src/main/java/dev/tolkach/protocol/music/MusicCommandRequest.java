@@ -19,13 +19,6 @@ public record MusicCommandRequest(
         String query
 ) {
     public MusicCommandRequest {
-        System.out.println("MusicCommandRequest:");
-        System.out.println("  requestId = " + requestId);
-        System.out.println("  action    = " + action);
-        System.out.println("  title    = " + title);
-        System.out.println("  artist   = " + artist);
-        System.out.println("  query    = " + query);
-
         validateRequestId(requestId);
         validateAction(action);
 
