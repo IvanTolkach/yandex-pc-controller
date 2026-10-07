@@ -6,6 +6,7 @@ import dev.tolkach.music.commands.MusicCommand;
 import dev.tolkach.music.connection.MusicUnavailableException;
 import dev.tolkach.protocol.music.MusicCommandRequest;
 import dev.tolkach.protocol.music.MusicCommandResponse;
+import dev.tolkach.protocol.music.MusicErrorCode;
 import dev.tolkach.protocol.music.PlaybackStateDto;
 import dev.tolkach.yandex.model.PlaybackState;
 
@@ -38,16 +39,16 @@ public class MusicCommandDispatcher {
 
             return MusicCommandResponse.success(request.requestId(), stateDto);
         } catch (NoActivePlaybackException exception) {
-            return MusicCommandResponse.failure(request.requestId(), "NO_ACTIVE_PLAYBACK", exception.getMessage());
+            return MusicCommandResponse.failure(request.requestId(), MusicErrorCode.NO_ACTIVE_PLAYBACK, exception.getMessage());
         } catch (MusicUnavailableException exception) {
-            return MusicCommandResponse.failure(request.requestId(), "MUSIC_UNAVAILABLE", exception.getMessage());
+            return MusicCommandResponse.failure(request.requestId(), MusicErrorCode.MUSIC_UNAVAILABLE, exception.getMessage());
         } catch (IllegalArgumentException exception) {
-            return MusicCommandResponse.failure(request.requestId(), "INVALID_COMMAND", exception.getMessage());
+            return MusicCommandResponse.failure(request.requestId(), MusicErrorCode.INVALID_COMMAND, exception.getMessage());
         } catch (IllegalStateException exception) {
-            return MusicCommandResponse.failure(request.requestId(), "PLAYER_ERROR", exception.getMessage());
+            return MusicCommandResponse.failure(request.requestId(), MusicErrorCode.PLAYER_ERROR, exception.getMessage());
         } catch (RuntimeException exception) {
             exception.printStackTrace();
-            return MusicCommandResponse.failure(request.requestId(), "INTERNAL_ERROR", exception.getMessage());
+            return MusicCommandResponse.failure(request.requestId(), MusicErrorCode.INTERNAL_ERROR, exception.getMessage());
         }
     }
 

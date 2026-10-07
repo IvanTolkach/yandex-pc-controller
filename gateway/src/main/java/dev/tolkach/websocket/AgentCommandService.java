@@ -2,6 +2,7 @@ package dev.tolkach.websocket;
 
 import dev.tolkach.protocol.music.MusicCommandRequest;
 import dev.tolkach.protocol.music.MusicCommandResponse;
+import dev.tolkach.protocol.music.MusicErrorCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -123,7 +124,7 @@ public class AgentCommandService {
                 requestId,
                 false,
                 null,
-                "AGENT_UNAVAILABLE",
+                MusicErrorCode.AGENT_UNAVAILABLE,
                 "Desktop agent is unavailable: " + deviceId
         );
     }
@@ -133,7 +134,7 @@ public class AgentCommandService {
                 requestId,
                 false,
                 null,
-                "AGENT_TIMEOUT",
+                MusicErrorCode.AGENT_TIMEOUT,
                 "Desktop agent did not respond within " + RESPONSE_TIMEOUT.toSeconds() + " seconds: " + deviceId
         );
     }

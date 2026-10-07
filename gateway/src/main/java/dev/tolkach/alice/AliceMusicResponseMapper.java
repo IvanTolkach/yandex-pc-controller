@@ -31,15 +31,15 @@ public class AliceMusicResponseMapper {
 
     private AliceResponse mapError(MusicCommandResponse response) {
         return switch (response.errorCode()) {
-            case "AGENT_UNAVAILABLE" -> AliceResponse.text("Компьютер сейчас недоступен");
+            case AGENT_UNAVAILABLE -> AliceResponse.text("Компьютер сейчас недоступен");
 
-            case "AGENT_TIMEOUT" -> AliceResponse.text("Компьютер не ответил на команду");
+            case AGENT_TIMEOUT -> AliceResponse.text("Компьютер не ответил на команду");
 
-            case "MUSIC_UNAVAILABLE" -> AliceResponse.text("Яндекс Музыка сейчас недоступна");
+            case MUSIC_UNAVAILABLE -> AliceResponse.text("Яндекс Музыка сейчас недоступна");
 
-            case "NO_ACTIVE_PLAYBACK" -> AliceResponse.text("Сейчас ничего не воспроизводится");
+            case NO_ACTIVE_PLAYBACK -> AliceResponse.text("Сейчас ничего не воспроизводится");
 
-            case "INVALID_COMMAND" -> AliceResponse.text("Не удалось понять музыкальную команду");
+            case INVALID_COMMAND -> AliceResponse.text("Не удалось понять музыкальную команду");
 
             default -> AliceResponse.text("Не удалось выполнить команду");
         };
