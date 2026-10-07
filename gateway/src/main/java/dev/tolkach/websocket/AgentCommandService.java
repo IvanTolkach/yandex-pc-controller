@@ -2,10 +2,11 @@ package dev.tolkach.websocket;
 
 import dev.tolkach.protocol.music.MusicCommandRequest;
 import dev.tolkach.protocol.music.MusicCommandResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
@@ -17,6 +18,8 @@ import java.util.concurrent.TimeUnit;
 
 @Service
 public class AgentCommandService {
+
+    private static final Logger log = LoggerFactory.getLogger(AgentCommandService.class);
 
     private static final Duration RESPONSE_TIMEOUT = Duration.ofSeconds(15);
 
@@ -51,9 +54,9 @@ public class AgentCommandService {
             return CompletableFuture.failedFuture(new IllegalStateException("Request already pending: " + request.requestId()));
         }
 
-        future.orTimeout(RESPONSE_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
-
         future.whenComplete((response, error) -> pending.remove(request.requestId(), pendingCommand));
+
+        scheduleTimeout(deviceId, request.requestId(), future);
 
         try {
             String json = jsonMapper.writeValueAsString(request);
@@ -69,6 +72,8 @@ public class AgentCommandService {
             }
         }
         catch (IOException | RuntimeException exception) {
+            log.warn("Failed to send command to agent: deviceId={}, requestId={}", deviceId, request.requestId(), exception);
+
             future.complete(agentUnavailable(request.requestId(), deviceId));
         }
 
@@ -79,10 +84,16 @@ public class AgentCommandService {
         PendingCommand pendingCommand = pending.get(response.requestId());
 
         if (pendingCommand == null) {
+            log.debug("Ignoring response for non-pending request: {}", response.requestId());
+
             return;
         }
 
-        pendingCommand.future().complete(response);
+        boolean completed = pendingCommand.future().complete(response);
+
+        if (!completed) {
+            log.debug("Request was already completed: {}", response.requestId());
+        }
     }
 
     public void failPending(String deviceId) {
@@ -95,6 +106,18 @@ public class AgentCommandService {
         });
     }
 
+    private void scheduleTimeout(String deviceId, String requestId, CompletableFuture<MusicCommandResponse> future) {
+        CompletableFuture
+                .delayedExecutor(RESPONSE_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)
+                .execute(() -> {
+                    boolean completed = future.complete(agentTimeout(requestId, deviceId));
+
+                    if (completed) {
+                        log.warn("Agent command timed out: deviceId={}, requestId={}, timeout={}s", deviceId, requestId, RESPONSE_TIMEOUT.toSeconds());
+                    }
+                });
+    }
+
     private MusicCommandResponse agentUnavailable(String requestId, String deviceId) {
         return new MusicCommandResponse(
                 requestId,
@@ -105,25 +128,14 @@ public class AgentCommandService {
         );
     }
 
-    private String extractRequestId(String json) {
-        try {
-            JsonNode root = jsonMapper.readTree(json);
-
-            JsonNode requestId = root.get("requestId");
-
-            if (requestId == null || requestId.isNull() || requestId.asString().isBlank()) {
-                throw new IllegalArgumentException("requestId is missing");
-            }
-
-            return requestId.asString();
-        }
-        catch (IllegalArgumentException exception) {
-            throw exception;
-        }
-        catch (Exception exception) {
-            throw new IllegalArgumentException("Invalid command JSON", exception);
-        }
-
+    private MusicCommandResponse agentTimeout(String requestId, String deviceId) {
+        return new MusicCommandResponse(
+                requestId,
+                false,
+                null,
+                "AGENT_TIMEOUT",
+                "Desktop agent did not respond within " + RESPONSE_TIMEOUT.toSeconds() + " seconds: " + deviceId
+        );
     }
 
     private record PendingCommand(String deviceId, CompletableFuture<MusicCommandResponse> future) {

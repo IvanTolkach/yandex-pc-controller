@@ -33,7 +33,12 @@ public class AliceMusicService {
         commandService.sendCommandAsync("my-pc", musicRequest)
                 .whenComplete((response, error) -> {
                     if (error != null) {
-                        log.error("Alice music command failed: requestId={}", musicRequest.requestId(), error);
+                        log.error("Alice music command failed unexpectedly: requestId={}", musicRequest.requestId(), error);
+                        return;
+                    }
+
+                    if (!response.success()) {
+                        log.warn("Alice music command rejected: requestId={}, errorCode={}, errorMessage={}", response.requestId(), response.errorCode(), response.errorMessage());
                         return;
                     }
 
