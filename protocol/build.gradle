@@ -1,5 +1,5 @@
 plugins {
-    id 'java'
+    id 'java-library'
 }
 
 group = 'dev.tolkach'
@@ -10,7 +10,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'com.fasterxml.jackson.core:jackson-annotations:2.22'
+    api 'com.fasterxml.jackson.core:jackson-annotations:2.22'
 
     testImplementation platform('org.junit:junit-bom:6.0.0')
     testImplementation 'org.junit.jupiter:junit-jupiter'
@@ -21,6 +21,8 @@ java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(25)
     }
+
+    withSourcesJar()
 }
 
 test {
