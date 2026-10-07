@@ -26,8 +26,8 @@ public class AgentSessionRegistry {
         return Optional.of(session);
     }
 
-    public void unregister(String deviceId, WebSocketSession session) {
-        sessions.remove(deviceId, session);
+    public boolean unregister(String deviceId, WebSocketSession session) {
+        return sessions.remove(deviceId, session);
     }
 
     public boolean isConnected(String deviceId) {

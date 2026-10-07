@@ -8,6 +8,7 @@ import org.springframework.web.socket.WebSocketSession;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -22,56 +23,86 @@ public class AgentCommandService {
     private final AgentSessionRegistry registry;
     private final JsonMapper jsonMapper;
 
-    private final Map<String, CompletableFuture<MusicCommandResponse>> pendingResponses = new ConcurrentHashMap<>();
+    private final Map<String, PendingCommand> pending = new ConcurrentHashMap<>();
 
     public AgentCommandService(AgentSessionRegistry registry, JsonMapper jsonMapper) {
         this.registry = registry;
         this.jsonMapper = jsonMapper;
     }
 
-    public MusicCommandResponse sendCommand(String deviceId, MusicCommandRequest request) throws Exception {
-        return sendCommandAsync(deviceId, request).get(RESPONSE_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+    public MusicCommandResponse sendCommand(String deviceId, MusicCommandRequest request) {
+        return sendCommandAsync(deviceId, request).join();
     }
 
     public CompletableFuture<MusicCommandResponse> sendCommandAsync(String deviceId, MusicCommandRequest request) {
-        WebSocketSession session = registry.find(deviceId).orElseThrow(() -> new IllegalStateException("Agent is not connected: " + deviceId));
+        WebSocketSession session = registry.find(deviceId).orElse(null);
 
-        String requestId = request.requestId();
+        if (session == null) {
+            return CompletableFuture.completedFuture(agentUnavailable(request.requestId(), deviceId));
+        }
 
         CompletableFuture<MusicCommandResponse> future = new CompletableFuture<>();
 
-        CompletableFuture<MusicCommandResponse> existing = pendingResponses.putIfAbsent(requestId, future);
+        PendingCommand pendingCommand = new PendingCommand(deviceId, future);
 
-        if (existing != null) {
-            throw new IllegalArgumentException("Duplicate requestId: " + requestId);
+        PendingCommand previous = pending.putIfAbsent(request.requestId(), pendingCommand);
+
+        if (previous != null) {
+            return CompletableFuture.failedFuture(new IllegalStateException("Request already pending: " + request.requestId()));
         }
+
+        future.orTimeout(RESPONSE_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+
+        future.whenComplete((response, error) -> pending.remove(request.requestId(), pendingCommand));
 
         try {
             String json = jsonMapper.writeValueAsString(request);
 
-            session.sendMessage(new TextMessage(json));
+            synchronized (session) {
+                if (!session.isOpen()) {
+                    future.complete(agentUnavailable(request.requestId(), deviceId));
 
-            future.orTimeout(RESPONSE_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+                    return future;
+                }
 
-            future.whenComplete((response, error) -> pendingResponses.remove(requestId, future));
-
-            return future;
+                session.sendMessage(new TextMessage(json));
+            }
         }
-        catch (Exception exception) {
-            pendingResponses.remove(requestId, future);
-
-            future.completeExceptionally(exception);
-
-            return future;
+        catch (IOException | RuntimeException exception) {
+            future.complete(agentUnavailable(request.requestId(), deviceId));
         }
+
+        return future;
     }
 
     public void completeResponse(MusicCommandResponse response) {
-        CompletableFuture<MusicCommandResponse> future = pendingResponses.get(response.requestId());
+        PendingCommand pendingCommand = pending.get(response.requestId());
 
-        if (future != null) {
-            future.complete(response);
+        if (pendingCommand == null) {
+            return;
         }
+
+        pendingCommand.future().complete(response);
+    }
+
+    public void failPending(String deviceId) {
+        pending.forEach((requestId, pendingCommand) -> {
+            if (!pendingCommand.deviceId().equals(deviceId)) {
+                return;
+            }
+
+            pendingCommand.future().complete(agentUnavailable(requestId, deviceId));
+        });
+    }
+
+    private MusicCommandResponse agentUnavailable(String requestId, String deviceId) {
+        return new MusicCommandResponse(
+                requestId,
+                false,
+                null,
+                "AGENT_UNAVAILABLE",
+                "Desktop agent is unavailable: " + deviceId
+        );
     }
 
     private String extractRequestId(String json) {
@@ -93,5 +124,8 @@ public class AgentCommandService {
             throw new IllegalArgumentException("Invalid command JSON", exception);
         }
 
+    }
+
+    private record PendingCommand(String deviceId, CompletableFuture<MusicCommandResponse> future) {
     }
 }

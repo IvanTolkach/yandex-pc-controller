@@ -52,7 +52,7 @@ public class AgentWebSocketHandler extends TextWebSocketHandler {
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
         String deviceId = extractDeviceId(session);
 
-        registry.unregister(deviceId, session);
+        handleDisconnect(session);
 
         log.info("Agent disconnected: deviceId={}, sessionId={}, status={}", deviceId, session.getId(), status);
     }
@@ -60,6 +60,18 @@ public class AgentWebSocketHandler extends TextWebSocketHandler {
     @Override
     public void handleTransportError(WebSocketSession session, Throwable exception) {
         log.error("WebSocket transport error: sessionId={}", session.getId(), exception);
+
+        handleDisconnect(session);
+    }
+
+    private void handleDisconnect(WebSocketSession session) {
+        String deviceId = extractDeviceId(session);
+
+        boolean removed = registry.unregister(deviceId, session);
+
+        if (removed) {
+            commandService.failPending(deviceId);
+        }
     }
 
     private String extractDeviceId(WebSocketSession session) {
