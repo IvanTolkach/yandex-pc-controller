@@ -1,5 +1,6 @@
 package dev.tolkach.yandex;
 
+import dev.tolkach.music.NoActivePlaybackException;
 import dev.tolkach.yandex.matching.AlbumMatcher;
 import dev.tolkach.yandex.matching.TrackMatcher;
 import dev.tolkach.yandex.model.AlbumSearchResult;
@@ -103,30 +104,37 @@ public class YandexMusicClient {
     }
 
     public PlaybackState getPlaybackState() {
+        ensurePlayerControlsAvailable();
         return playerBar.getState();
     }
 
     public void pause() {
+        ensurePlayerControlsAvailable();
         playerBar.pause();
     }
 
     public void resume() {
+        ensurePlayerControlsAvailable();
         playerBar.resume();
     }
 
     public void next() {
+        ensurePlayerControlsAvailable();
         playerBar.next();
     }
 
     public void previous() {
+        ensurePlayerControlsAvailable();
         playerBar.previous();
     }
 
     public void volumeUp() {
+        ensurePlayerControlsAvailable();
         playerBar.volumeUp();
     }
 
     public void volumeDown() {
+        ensurePlayerControlsAvailable();
         playerBar.volumeDown();
     }
 
@@ -141,6 +149,12 @@ public class YandexMusicClient {
 
         if (artist == null || artist.isBlank()) {
             throw new IllegalArgumentException("Artist must not be empty");
+        }
+    }
+
+    private void ensurePlayerControlsAvailable() {
+        if (!musicPage.ensureStandardPlayerBar()) {
+            throw new NoActivePlaybackException();
         }
     }
 }
