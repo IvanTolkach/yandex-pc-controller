@@ -275,7 +275,7 @@ public class AliceMusicCommandParser {
     private MusicCommandRequest playQueryCommand(String query) {
         return new MusicCommandRequest(
                 UUID.randomUUID().toString(),
-                MusicAction.PLAY_TRACK,
+                MusicAction.PLAY_QUERY,
                 null,
                 null,
                 query);
