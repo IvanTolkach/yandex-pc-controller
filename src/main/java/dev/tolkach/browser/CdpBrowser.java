@@ -1,6 +1,7 @@
 package dev.tolkach.browser;
 
 import com.microsoft.playwright.Browser;
+import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 
@@ -21,7 +22,9 @@ public class CdpBrowser implements AutoCloseable{
 
         playwright.selectors().setTestIdAttribute("data-test-id");
 
-        Browser browser = playwright.chromium().connectOverCDP(cdpUrl);
+        Browser browser = playwright.chromium().connectOverCDP(cdpUrl,
+                new BrowserType.ConnectOverCDPOptions().setNoDefaults(true).setIsLocal(true)
+        );
 
         return new CdpBrowser(playwright, browser);
     }
