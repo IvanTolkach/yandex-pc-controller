@@ -12,17 +12,27 @@ import java.util.regex.Pattern;
 @Component
 public class AliceMusicCommandParser {
 
+    private static final String INTENT_PAUSE = "pause";
+    private static final String INTENT_RESUME = "resume";
+    private static final String INTENT_NEXT = "next";
+    private static final String INTENT_PREVIOUS = "previous";
+    private static final String INTENT_VOLUME_UP = "volumeup";
+    private static final String INTENT_VOLUME_DOWN = "volumedown";
+    private static final String INTENT_PLAY_ALBUM = "playalbum";
+    private static final String INTENT_PLAY_QUERY = "playquery";
+    private static final String INTENT_PLAY_TRACK = "playtrack";
+
     private static final Pattern PLAY_TRACK_PATTERN = Pattern.compile("^включи\\s+(.+?)\\s+исполнителя\\s+(.+)$", Pattern.CASE_INSENSITIVE);
 
-    private static final Pattern PLAY_ALBUM_PATTERN = Pattern.compile("^(?:включи|поставь|запусти)\\s+альбом\\s+(.+?)(?:\\s+исполнителя\\s+(.+))?$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PLAY_ALBUM_PATTERN = Pattern.compile("^(?:включи|включить|поставь|поставить|запусти|запустить)\\s+альбом\\s+(.+?)" + "(?:\\s+исполнителя\\s+(.+))?$", Pattern.CASE_INSENSITIVE);
 
     private static final Pattern PAUSE_PATTERN = Pattern.compile("^(поставь\\s+на\\s+паузу|пауза|останови|приостанови|стоп|хватит).*", Pattern.CASE_INSENSITIVE);
 
     private static final Pattern RESUME_PATTERN = Pattern.compile("^(продолжи|возобнови|воспроизведи).*", Pattern.CASE_INSENSITIVE);
 
-    private static final Pattern NEXT_PATTERN = Pattern.compile("^(вперёд|следующий|следующий\\s+трек|включи\\s+следующий).*", Pattern.CASE_INSENSITIVE);
+    private static final Pattern NEXT_PATTERN = Pattern.compile("^(вперёд|следующий|следующий\\s+трек|включи\\s+следующий|включить\\s+следующий).*", Pattern.CASE_INSENSITIVE);
 
-    private static final Pattern PREVIOUS_PATTERN = Pattern.compile("^(назад|предыдущий|предыдущий\\s+трек|включи\\s+предыдущий).*", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PREVIOUS_PATTERN = Pattern.compile("^(назад|предыдущий|предыдущий\\s+трек|включи\\s+предыдущий|включить\\s+предыдущий).*", Pattern.CASE_INSENSITIVE);
 
     private static final Pattern VOLUME_UP_PATTERN = Pattern.compile("^(?:громче|сделай громче|прибавь громкость).*", Pattern.CASE_INSENSITIVE);
 
@@ -49,40 +59,16 @@ public class AliceMusicCommandParser {
 
         String normalized = command.trim();
 
-        if (PAUSE_PATTERN.matcher(normalized).matches()) {
-            return Optional.of(command(MusicAction.PAUSE));
+        Optional<MusicCommandRequest> controlCommand = parseControlCommand(normalized);
+
+        if (controlCommand.isPresent()) {
+            return controlCommand;
         }
 
-        if (RESUME_PATTERN.matcher(normalized).matches()) {
-            return Optional.of(command(MusicAction.RESUME));
-        }
+        Optional<MusicCommandRequest> albumCommand = parsePlayAlbum(normalized);
 
-        if (NEXT_PATTERN.matcher(normalized).matches()) {
-            return Optional.of(command(MusicAction.NEXT));
-        }
-
-        if (PREVIOUS_PATTERN.matcher(normalized).matches()) {
-            return Optional.of(command(MusicAction.PREVIOUS));
-        }
-
-        if (VOLUME_UP_PATTERN.matcher(normalized).matches()) {
-            return Optional.of(command(MusicAction.VOLUME_UP));
-        }
-
-        if (VOLUME_DOWN_PATTERN.matcher(normalized).matches()) {
-            return Optional.of(command(MusicAction.VOLUME_DOWN));
-        }
-
-        Optional<MusicCommandRequest> album = parsePlayAlbum(normalized);
-
-        if (album.isPresent()) {
-            return album;
-        }
-
-        Optional<MusicCommandRequest> track = parsePlayTrack(normalized);
-
-        if (track.isPresent()) {
-            return track;
+        if (albumCommand.isPresent()) {
+            return albumCommand;
         }
 
         return parsePlayQuery(normalized);
@@ -93,98 +79,118 @@ public class AliceMusicCommandParser {
             return Optional.empty();
         }
 
-        if (nlu.intents().containsKey("pause")) {
-            return Optional.of(command(MusicAction.PAUSE));
+        Optional<MusicCommandRequest> controlCommand = parseControlIntent(nlu);
+
+        if (controlCommand.isPresent()) {
+            return controlCommand;
         }
 
-        if (nlu.intents().containsKey("resume")) {
-            return Optional.of(command(MusicAction.RESUME));
-        }
-
-        if (nlu.intents().containsKey("next")) {
-            return Optional.of(command(MusicAction.NEXT));
-        }
-
-        if (nlu.intents().containsKey("previous")) {
-            return Optional.of(command(MusicAction.PREVIOUS));
-        }
-
-        if (nlu.intents().containsKey("volumeup")) {
-            return Optional.of(command(MusicAction.VOLUME_UP));
-        }
-
-        if (nlu.intents().containsKey("volumedown")) {
-            return Optional.of(command(MusicAction.VOLUME_DOWN));
-        }
-
-        AliceRequest.Intent playAlbum = nlu.intents().get("playalbum");
+        AliceRequest.Intent playAlbum = nlu.intents().get(INTENT_PLAY_ALBUM);
 
         if (playAlbum != null) {
-            String title = slotValue(playAlbum, "title");
+            Optional<MusicCommandRequest> albumCommand = parsePlayAlbumIntent(playAlbum);
 
-            String artist = slotValue(playAlbum, "artist");
-
-            if (title != null && !title.isBlank()) {
-                return Optional.of(
-                        new MusicCommandRequest(
-                                UUID.randomUUID().toString(),
-                                MusicAction.PLAY_ALBUM,
-                                title,
-                                artist,
-                                null
-                        )
-                );
+            if (albumCommand.isPresent()) {
+                return albumCommand;
             }
         }
 
-        AliceRequest.Intent playQuery = nlu.intents().get("playquery");
+        AliceRequest.Intent playQuery = nlu.intents().get(INTENT_PLAY_QUERY);
 
         if (playQuery != null) {
             String query = slotValue(playQuery, "query");
 
-            if (query != null && !query.isBlank()) {
-                return Optional.of(
-                        new MusicCommandRequest(
-                                UUID.randomUUID().toString(),
-                                MusicAction.PLAY_QUERY,
-                                null,
-                                null,
-                                query
-                        )
-                );
+            if (query != null) {
+                return Optional.of(playQueryCommand(query));
             }
         }
 
-        AliceRequest.Intent playTrack = nlu.intents().get("playtrack");
+        AliceRequest.Intent playTrack = nlu.intents().get(INTENT_PLAY_TRACK);
 
         if (playTrack != null) {
             String title = slotValue(playTrack, "title");
-
             String artist = slotValue(playTrack, "artist");
 
-            if (title != null && !title.isBlank()) {
-                if (artist == null || artist.isBlank()) {
-                    return Optional.of(
-                            new MusicCommandRequest(
-                                    UUID.randomUUID().toString(),
-                                    MusicAction.PLAY_QUERY,
-                                    null,
-                                    null,
-                                    title
-                            )
-                    );
-                }
+            String query = combineQuery(title, artist);
 
-                return Optional.of(
-                        new MusicCommandRequest(
-                                UUID.randomUUID().toString(),
-                                MusicAction.PLAY_TRACK,
-                                title,
-                                artist,
-                                null
-                        )
-                );
+            if (query != null) {
+                return Optional.of(playQueryCommand(query));
             }
+        }
+
+        return Optional.empty();
+    }
+
+    private Optional<MusicCommandRequest> parseControlIntent(AliceRequest.Nlu nlu) {
+        if (nlu.intents().containsKey(INTENT_PAUSE)) {
+            return Optional.of(command(MusicAction.PAUSE));
+        }
+
+        if (nlu.intents().containsKey(INTENT_RESUME)) {
+            return Optional.of(command(MusicAction.RESUME));
+        }
+
+        if (nlu.intents().containsKey(INTENT_NEXT)) {
+            return Optional.of(command(MusicAction.NEXT));
+        }
+
+        if (nlu.intents().containsKey(INTENT_PREVIOUS)) {
+            return Optional.of(command(MusicAction.PREVIOUS));
+        }
+
+        if (nlu.intents().containsKey(INTENT_VOLUME_UP)) {
+            return Optional.of(command(MusicAction.VOLUME_UP));
+        }
+
+        if (nlu.intents().containsKey(INTENT_VOLUME_DOWN)) {
+            return Optional.of(command(MusicAction.VOLUME_DOWN));
+        }
+
+        return Optional.empty();
+    }
+
+    private Optional<MusicCommandRequest> parsePlayAlbumIntent(AliceRequest.Intent intent) {
+        String title = slotValue(intent, "title");
+        String artist = slotValue(intent, "artist");
+
+        if (title == null) {
+            return Optional.empty();
+        }
+
+        return Optional.of(
+                new MusicCommandRequest(
+                        UUID.randomUUID().toString(),
+                        MusicAction.PLAY_ALBUM,
+                        title,
+                        artist,
+                        null
+                )
+        );
+    }
+
+    private Optional<MusicCommandRequest> parseControlCommand(String command) {
+        if (PAUSE_PATTERN.matcher(command).matches()) {
+            return Optional.of(command(MusicAction.PAUSE));
+        }
+
+        if (RESUME_PATTERN.matcher(command).matches()) {
+            return Optional.of(command(MusicAction.RESUME));
+        }
+
+        if (NEXT_PATTERN.matcher(command).matches()) {
+            return Optional.of(command(MusicAction.NEXT));
+        }
+
+        if (PREVIOUS_PATTERN.matcher(command).matches()) {
+            return Optional.of(command(MusicAction.PREVIOUS));
+        }
+
+        if (VOLUME_UP_PATTERN.matcher(command).matches()) {
+            return Optional.of(command(MusicAction.VOLUME_UP));
+        }
+
+        if (VOLUME_DOWN_PATTERN.matcher(command).matches()) {
+            return Optional.of(command(MusicAction.VOLUME_DOWN));
         }
 
         return Optional.empty();
@@ -263,17 +269,20 @@ public class AliceMusicCommandParser {
             return Optional.empty();
         }
 
-        return Optional.of(new MusicCommandRequest(
+        return Optional.of(playQueryCommand(query));
+    }
+
+    private MusicCommandRequest playQueryCommand(String query) {
+        return new MusicCommandRequest(
                 UUID.randomUUID().toString(),
-                MusicAction.PLAY_QUERY,
+                MusicAction.PLAY_TRACK,
                 null,
                 null,
-                query)
-        );
+                query);
     }
 
     private String extractPlayQuery(String command) {
-        String[] prefixes = {"включи ", "поставь ", "запусти "};
+        String[] prefixes = {"включить ", "включи ", "поставить ", "поставь ", "запустить ", "запусти "};
 
         for (String prefix : prefixes) {
             if (command.toLowerCase().startsWith(prefix)) {
@@ -282,10 +291,27 @@ public class AliceMusicCommandParser {
                 if (!query.isBlank()) {
                     return query;
                 }
+
+                return null;
             }
         }
 
         return null;
+    }
+
+    private String combineQuery(String title, String artist) {
+        boolean hasTitle = title != null && !title.isBlank();
+        boolean hasArtist = artist != null && !artist.isBlank();
+
+        if (!hasTitle && !hasArtist) {
+            return null;
+        }
+
+        if (hasTitle && hasArtist) {
+            return title + " " + artist;
+        }
+
+        return hasTitle ? title : artist;
     }
 
     private MusicCommandRequest command(MusicAction action) {
