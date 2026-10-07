@@ -23,12 +23,6 @@ public class AliceWebhookController {
     public AliceResponse webhook(@RequestBody AliceRequest request) {
         log.info("Alice request: '{}'", request);
 
-        boolean accepted = musicService.handle(request);
-
-        if (!accepted) {
-            return AliceResponse.text("Я не поняла команду.");
-        }
-
-        return AliceResponse.text("Выполняю.");
+        return musicService.handle(request);
     }
 }
