@@ -3,6 +3,7 @@ package dev.tolkach.yandex;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.options.WaitForSelectorState;
+import dev.tolkach.music.NoActivePlaybackException;
 import dev.tolkach.yandex.model.PlaybackState;
 
 import java.net.URI;
@@ -21,6 +22,8 @@ public class PlayerBar {
     private static final String PLAY_BUTTON_TEST_ID = "PLAY_BUTTON";
 
     private static final String NEXT_TRACK_TEST_ID = "NEXT_TRACK_BUTTON";
+
+    private static final String PREVIOUS_TRACK_TEST_ID = "PREVIOUS_TRACK_BUTTON";
 
     private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(10);
 
@@ -41,29 +44,33 @@ public class PlayerBar {
     }
 
     public PlaybackState getState() {
-        Locator playerBar = getPlayerBar();
+        Locator playerBar = requireExistingPlayerBar();
 
-        Locator titleLink = playerBar.getByTestId(TRACK_TITLE_TEST_ID);
+        Locator titleLink = playerBar.getByTestId(TRACK_TITLE_TEST_ID).first();
+
+        if (titleLink.count() == 0) {
+            throw new NoActivePlaybackException();
+        }
 
         String title = titleLink.innerText().trim();
 
         String href = titleLink.getAttribute("href");
 
-        if (href == null || href.isBlank()) {
-            throw new IllegalStateException("Current track href is missing");
-        }
-
         String trackId = extractQueryParameter(href, "trackId");
 
-        Locator artistLinks = playerBar.getByTestId(ARTIST_TITLE_TEST_ID);
+        List<String> artists = playerBar
+                .getByTestId(ARTIST_TITLE_TEST_ID)
+                .all()
+                .stream()
+                .filter(Locator::isVisible)
+                .map(Locator::innerText)
+                .map(String::trim)
+                .filter(value -> !value.isBlank())
+                .toList();
 
-        List<String> artists = artistLinks.allInnerTexts()
-                        .stream()
-                        .map(String::trim)
-                        .filter(value -> !value.isBlank())
-                        .toList();
+        Locator pauseButton = playerBar.getByTestId(PAUSE_BUTTON_TEST_ID);
 
-        boolean playing = isPlaying(playerBar);
+        boolean playing = pauseButton.count() > 0 && pauseButton.first().isVisible();
 
         return new PlaybackState(trackId, title, artists, playing);
     }
@@ -175,33 +182,52 @@ public class PlayerBar {
     }
 
     public void pause() {
-        Locator playerBar = getPlayerBar();
+        Locator playerBar = requireExistingPlayerBar();
 
-        Locator pauseButton = playerBar.getByTestId(PAUSE_BUTTON_TEST_ID);
+        Locator pauseButton = playerBar.getByTestId(PAUSE_BUTTON_TEST_ID).first();
 
-        if (pauseButton.count() == 0) {
+        if (pauseButton.count() > 0 && pauseButton.isVisible()) {
+            pauseButton.click();
             return;
         }
 
-        pauseButton.click();
+        Locator playButton = playerBar.getByTestId(PLAY_BUTTON_TEST_ID).first();
+
+        if (playButton.count() > 0 && playButton.isVisible()) {
+            return;
+        }
+
+        throw new NoActivePlaybackException();
     }
 
     public void resume() {
-        Locator playerBar = getPlayerBar();
+        Locator playerBar = requireExistingPlayerBar();
 
-        Locator playButton = playerBar.getByTestId(PLAY_BUTTON_TEST_ID);
+        Locator pauseButton = playerBar.getByTestId(PAUSE_BUTTON_TEST_ID);
 
-        if (playButton.count() == 0) {
+        if (pauseButton.count() > 0 && pauseButton.first().isVisible()) {
             return;
         }
 
-        playButton.click();
+        Locator playButton = playerBar.getByTestId(PLAY_BUTTON_TEST_ID);
+
+        if (playButton.count() == 0 || !playButton.first().isVisible()) {
+            throw new NoActivePlaybackException();
+        }
+
+        playButton.first().click();
     }
 
     public void next() {
+        Locator playerBar = requireExistingPlayerBar();
+
         PlaybackState before = getState();
 
-        Locator nextButton = getPlayerBar().getByTestId(NEXT_TRACK_TEST_ID);
+        Locator nextButton = playerBar.getByTestId("NEXT_TRACK_BUTTON").first();
+
+        if (nextButton.count() == 0 || !nextButton.isVisible()) {
+            throw new NoActivePlaybackException();
+        }
 
         if (!nextButton.isEnabled()) {
             return;
@@ -209,27 +235,39 @@ public class PlayerBar {
 
         nextButton.click();
 
-        waitUntilTrackChangedAndPlaying(before.trackId(), Duration.ofSeconds(10));
+        waitUntilTrackChangedAndPlaying(before.trackId(), DEFAULT_TIMEOUT);
     }
 
     public void previous() {
-        Locator previousButton = getPlayerBar().getByTestId("PREVIOUS_TRACK_BUTTON");
+        Locator playerBar = requireExistingPlayerBar();
+
+        PlaybackState before = getState();
+
+        Locator previousButton = playerBar.getByTestId(PREVIOUS_TRACK_TEST_ID).first();
+
+        if (previousButton.count() == 0 || !previousButton.isVisible()) {
+            throw new NoActivePlaybackException();
+        }
 
         if (!previousButton.isEnabled()) {
             return;
         }
 
-        String originalTrackId = getState().trackId();
-
         previousButton.click();
 
-        if (waitUntilTrackChanged(originalTrackId, Duration.ofSeconds(2))) {
-            return;
-        }
+        boolean changed = waitUntilTrackChanged(before.trackId(), PREVIOUS_TRACK_ACTION_TIMEOUT);
 
-        if (previousButton.isEnabled()) {
+        if (!changed) {
+            previousButton = requireExistingPlayerBar().getByTestId(PREVIOUS_TRACK_TEST_ID).first();
+
+            if (!previousButton.isEnabled()) {
+                return;
+            }
+
             previousButton.click();
         }
+
+        waitUntilTrackChangedAndPlaying(before.trackId(), PREVIOUS_TRACK_ACTION_TIMEOUT);
     }
 
     public void volumeUp() {
@@ -241,13 +279,24 @@ public class PlayerBar {
     }
 
     private Locator getPlayerBar() {
-        Locator playerBar = page.getByTestId(PLAYERBAR_TEST_ID);
+        Locator playerBar = page.getByTestId(PLAYERBAR_TEST_ID).first();
 
-        playerBar.first().waitFor(new Locator.WaitForOptions()
-                        .setState(WaitForSelectorState.VISIBLE)
-                        .setTimeout(DEFAULT_TIMEOUT.toMillis()));
+        playerBar.waitFor(new Locator.WaitForOptions()
+                .setState(WaitForSelectorState.VISIBLE)
+                .setTimeout(DEFAULT_TIMEOUT.toMillis())
+        );
 
-        return playerBar.first();
+        return playerBar;
+    }
+
+    private Locator requireExistingPlayerBar() {
+        Locator playerBar = page.getByTestId(PLAYERBAR_TEST_ID).first();
+
+        if (playerBar.count() == 0 || !playerBar.isVisible()) {
+            throw new NoActivePlaybackException();
+        }
+
+        return playerBar;
     }
 
     private boolean isPlaying(Locator playerBar) {
@@ -299,7 +348,8 @@ public class PlayerBar {
         while (System.nanoTime() < deadline) {
             PlaybackState currentState = getState();
 
-            if (!originalTrackId.equals(currentState.trackId())) {
+            if (currentState.trackId() != null && !currentState.trackId().equals(originalTrackId)) {
+
                 return true;
             }
 
@@ -310,47 +360,42 @@ public class PlayerBar {
     }
 
     private void changeVolume(double delta) {
-        Locator volumeSlider = getPlayerBar().getByTestId("CHANGE_VOLUME_SLIDER");
+        Locator playerBar = requireExistingPlayerBar();
 
-        String value = volumeSlider.getAttribute("value");
+        Locator slider = playerBar.getByTestId("CHANGE_VOLUME_SLIDER").first();
 
-        if (value == null || value.isBlank()) {
-            throw new IllegalStateException("Volume slider value is missing");
+        if (slider.count() == 0 || !slider.isVisible()) {
+            throw new NoActivePlaybackException();
         }
 
-        double currentVolume;
+        String valueAttribute = slider.getAttribute("value");
 
-        try {
-            currentVolume = Double.parseDouble(value);
-        }
-        catch (NumberFormatException exception) {
-            throw new IllegalStateException("Invalid volume value: " + value, exception);
+        if (valueAttribute == null) {
+            throw new IllegalStateException("Volume slider has no value");
         }
 
-        double newVolume = Math.max(0.0, Math.min(1.0, currentVolume + delta));
+        double current = Double.parseDouble(valueAttribute);
 
-        if (Double.compare(currentVolume, newVolume) == 0) {
-            return;
-        }
+        double target = Math.max(0.0, Math.min(1.0, current + delta));
 
-        setVolume(volumeSlider, newVolume);
+        setVolume(slider, current, target);
     }
 
-    private void setVolume(Locator volumeSlider, double targetVolume) {
-        double currentVolume = Double.parseDouble(volumeSlider.getAttribute("value"));
+    private void setVolume(Locator slider, double current, double target) {
+        final double sliderStep = 0.01;
 
-        int steps = (int) Math.round(Math.abs(targetVolume - currentVolume) / 0.01);
+        int steps = (int) Math.round(Math.abs(target - current) / sliderStep);
 
         if (steps == 0) {
             return;
         }
 
-        volumeSlider.focus();
+        slider.focus();
 
-        String key = targetVolume > currentVolume ? "ArrowUp" : "ArrowDown";
+        String key = target > current ? "ArrowUp" : "ArrowDown";
 
         for (int i = 0; i < steps; i++) {
-            volumeSlider.press(key);
+            slider.press(key);
         }
     }
 

@@ -20,13 +20,21 @@ public class CdpBrowser implements AutoCloseable{
     public static CdpBrowser connect(String cdpUrl) {
         Playwright playwright = Playwright.create();
 
-        playwright.selectors().setTestIdAttribute("data-test-id");
+        try {
 
-        Browser browser = playwright.chromium().connectOverCDP(cdpUrl,
-                new BrowserType.ConnectOverCDPOptions().setNoDefaults(true).setIsLocal(true)
-         );
 
-        return new CdpBrowser(playwright, browser);
+            playwright.selectors().setTestIdAttribute("data-test-id");
+
+            Browser browser = playwright.chromium().connectOverCDP(cdpUrl,
+                    new BrowserType.ConnectOverCDPOptions().setNoDefaults(true).setIsLocal(true)
+            );
+
+            return new CdpBrowser(playwright, browser);
+        }
+        catch (RuntimeException exception) {
+            playwright.close();
+            throw exception;
+        }
     }
 
     public Browser browser(){

@@ -1,7 +1,9 @@
 package dev.tolkach.music.protocol;
 
+import dev.tolkach.music.NoActivePlaybackException;
 import dev.tolkach.music.commands.MusicCommandHandler;
 import dev.tolkach.music.commands.MusicCommand;
+import dev.tolkach.music.connection.MusicUnavailableException;
 import dev.tolkach.protocol.music.MusicCommandRequest;
 import dev.tolkach.protocol.music.MusicCommandResponse;
 import dev.tolkach.protocol.music.PlaybackStateDto;
@@ -35,10 +37,17 @@ public class MusicCommandDispatcher {
             PlaybackStateDto stateDto = toDto(state);
 
             return MusicCommandResponse.success(request.requestId(), stateDto);
+        } catch (NoActivePlaybackException exception) {
+            return MusicCommandResponse.failure(request.requestId(), "NO_ACTIVE_PLAYBACK", exception.getMessage());
+        } catch (MusicUnavailableException exception) {
+            return MusicCommandResponse.failure(request.requestId(), "MUSIC_UNAVAILABLE", exception.getMessage());
         } catch (IllegalArgumentException exception) {
             return MusicCommandResponse.failure(request.requestId(), "INVALID_COMMAND", exception.getMessage());
         } catch (IllegalStateException exception) {
             return MusicCommandResponse.failure(request.requestId(), "PLAYER_ERROR", exception.getMessage());
+        } catch (RuntimeException exception) {
+            exception.printStackTrace();
+            return MusicCommandResponse.failure(request.requestId(), "INTERNAL_ERROR", exception.getMessage());
         }
     }
 
