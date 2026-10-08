@@ -33,6 +33,10 @@ public class AliceMusicService {
     }
 
     public AliceResponse handle(AliceRequest request) {
+        if (isActivationRequest(request)) {
+            return AliceResponse.text("Готово. Слушаю команды.");
+        }
+
         Optional<MusicCommandRequest> parsed = parser.parse(request);
 
         if (parsed.isEmpty()) {
@@ -67,6 +71,18 @@ public class AliceMusicService {
 
             return AliceResponse.text("Не удалось выполнить команду");
         }
+    }
+
+    private boolean isActivationRequest(AliceRequest request) {
+        if (request == null || request.request() == null) {
+            return false;
+        }
+
+        String command = request.request().command();
+
+        String originalUtterance = request.request().originalUtterance();
+
+        return (command == null || command.isBlank()) && (originalUtterance == null || originalUtterance.isBlank());
     }
 
     private void logResponse(MusicCommandResponse response) {

@@ -11,6 +11,10 @@ public record AliceResponse(Response response, String version) {
             boolean endSession) {}
 
     public static AliceResponse text(String text) {
+        return new AliceResponse(new Response(text, false), "1.0");
+    }
+
+    public static AliceResponse end(String text) {
         return new AliceResponse(new Response(text, true), "1.0");
     }
 }

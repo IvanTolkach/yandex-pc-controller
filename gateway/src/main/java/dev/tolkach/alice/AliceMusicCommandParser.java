@@ -26,7 +26,7 @@ public class AliceMusicCommandParser {
 
     private static final Pattern ALBUM_WITH_ARTIST_PATTERN = Pattern.compile("(?iu)^(.+?)\\s+(?:исполнителя|исполнитель|от)\\s+(.+?)\\s*$");
 
-    private static final Pattern PAUSE_PATTERN = Pattern.compile("^(поставь\\s+на\\s+паузу|пауза|останови|приостанови|стоп|хватит).*", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PAUSE_PATTERN = Pattern.compile("^(поставь\\s+на\\s+паузу|пауза|останови|приостанови|хватит).*", Pattern.CASE_INSENSITIVE);
 
     private static final Pattern RESUME_PATTERN = Pattern.compile("^(продолжи|возобнови|воспроизведи).*", Pattern.CASE_INSENSITIVE);
 
