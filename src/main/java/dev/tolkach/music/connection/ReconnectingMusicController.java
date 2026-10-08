@@ -143,6 +143,7 @@ public class ReconnectingMusicController implements MusicController, AutoCloseab
 
         if (!running) {
             restartAttemptedForCurrentAppRun = false;
+            launcher.forgetManagedInstance();
             return;
         }
 
@@ -356,8 +357,17 @@ public class ReconnectingMusicController implements MusicController, AutoCloseab
         CompletableFuture<Void> future = new CompletableFuture<>();
 
         executor.execute(() -> {
-            disconnect();
-            future.complete(null);
+            try {
+                disconnect();
+
+                launcher.closeManagedInstance();
+            }
+            catch (RuntimeException exception) {
+                System.err.println("Failed to shut down Yandex Music cleanly: " + exception.getMessage());
+            }
+            finally {
+                future.complete(null);
+            }
         });
 
         future.join();

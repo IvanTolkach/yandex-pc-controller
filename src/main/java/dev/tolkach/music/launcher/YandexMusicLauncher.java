@@ -17,16 +17,27 @@ public class YandexMusicLauncher {
     private final YandexMusicExecutableLocator executableLocator;
     private final CdpEndpointProbe cdpProbe;
 
+    private boolean managedByDesktop;
+
     public YandexMusicLauncher(YandexMusicLaunchConfig config, YandexMusicExecutableLocator executableLocator) {
         this.config = config;
         this.executableLocator = executableLocator;
         this.cdpProbe = new CdpEndpointProbe(config.cdpUrl());
     }
 
+    public boolean isManagedByDesktop() {
+        return managedByDesktop;
+    }
+
+    public void forgetManagedInstance() {
+        managedByDesktop = false;
+    }
+
     public void ensureRunning() {
         if (cdpProbe.isAvailable()) {
             System.out.println("Yandex Music CDP is already available.");
 
+            managedByDesktop = false;
             return;
         }
 
@@ -36,6 +47,7 @@ public class YandexMusicLauncher {
 
         if (!runningProcess.isEmpty()) {
             if (waitForCdp(CDP_GRACE_PERIOD)) {
+                managedByDesktop = false;
                 return;
             }
 
@@ -43,10 +55,14 @@ public class YandexMusicLauncher {
 
             restart(executable, runningProcess);
 
+            managedByDesktop = true;
+
             return;
         }
 
         startAndWait(executable);
+
+        managedByDesktop = true;
     }
 
     public boolean isCdpAvailable() {
@@ -77,6 +93,43 @@ public class YandexMusicLauncher {
         stopProcess(processes);
 
         startAndWait(executable);
+
+        managedByDesktop = true;
+    }
+
+    public void closeManagedInstance() {
+        if (!managedByDesktop) {
+            return;
+        }
+
+        Path executable;
+
+        try {
+            executable = executableLocator.locate();
+        }
+        catch (RuntimeException exception) {
+            System.err.println("Failed to locate Yandex Music during shutdown: " + exception.getMessage());
+
+            return;
+        }
+
+        List<ProcessHandle> processes = findRunningProcesses(executable);
+
+        if (processes.isEmpty()) {
+            managedByDesktop = false;
+            return;
+        }
+
+        System.out.println("Closing Desktop-managed Yandex Music...");
+
+        try {
+            stopProcess(processes);
+
+            System.out.println("Desktop-managed Yandex Music closed.");
+        }
+        finally {
+            managedByDesktop = false;
+        }
     }
 
     private void restart(Path executable, List<ProcessHandle> runningProcesses) {
