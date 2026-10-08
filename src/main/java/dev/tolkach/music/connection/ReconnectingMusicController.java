@@ -59,17 +59,17 @@ public class ReconnectingMusicController implements MusicController, AutoCloseab
 
     @Override
     public PlaybackState playTrack(String title, String artist) {
-        return invoke(controller -> controller.playTrack(title, artist));
+        return invoke(true, controller -> controller.playTrack(title, artist));
     }
 
     @Override
     public PlaybackState playQuery(String query) {
-        return invoke(controller -> controller.playQuery(query));
+        return invoke(true, controller -> controller.playQuery(query));
     }
 
     @Override
     public PlaybackState playAlbum(String title, String artist) {
-        return invoke(controller -> controller.playAlbum(title, artist));
+        return invoke(true, controller -> controller.playAlbum(title, artist));
     }
 
     @Override
@@ -87,7 +87,7 @@ public class ReconnectingMusicController implements MusicController, AutoCloseab
 
     @Override
     public void resume() {
-        invoke(controller -> {
+        invoke(true, controller -> {
             controller.resume();
             return null;
         });
@@ -95,7 +95,7 @@ public class ReconnectingMusicController implements MusicController, AutoCloseab
 
     @Override
     public void next() {
-        invoke(controller -> {
+        invoke(true, controller -> {
             controller.next();
             return null;
         });
@@ -103,7 +103,7 @@ public class ReconnectingMusicController implements MusicController, AutoCloseab
 
     @Override
     public void previous() {
-        invoke(controller -> {
+        invoke(true, controller -> {
             controller.previous();
             return null;
         });
@@ -203,6 +203,10 @@ public class ReconnectingMusicController implements MusicController, AutoCloseab
     }
 
     private <T> T invoke(Function<MusicController, T> operation) {
+        return invoke(false, operation);
+    }
+
+    private <T> T invoke(boolean launchIfNeeded, Function<MusicController, T> operation) {
         if (closing) {
             throw new MusicUnavailableException("Music controller is shutting down");
         }
@@ -210,15 +214,13 @@ public class ReconnectingMusicController implements MusicController, AutoCloseab
         CompletableFuture<T> future = new CompletableFuture<>();
 
         executor.execute(() -> {
-            ensureConnection();
-
-            if (session == null) {
-                future.completeExceptionally(new MusicUnavailableException("Yandex Music is not available"));
-
-                return;
-            }
-
             try {
+                ensureConnection(launchIfNeeded);
+
+                if (session == null) {
+                    throw new MusicUnavailableException("Yandex Music is not available");
+                }
+
                 T result = operation.apply(session.controller());
 
                 future.complete(result);
@@ -231,7 +233,7 @@ public class ReconnectingMusicController implements MusicController, AutoCloseab
         return join(future);
     }
 
-    private void ensureConnection() {
+    private void ensureConnection(boolean launchIfNeeded) {
         if (session != null) {
             if (session.ping()) {
                 return;
@@ -244,10 +246,37 @@ public class ReconnectingMusicController implements MusicController, AutoCloseab
 
         if (launcher.isCdpAvailable()) {
             connect();
+
+            if (session == null) {
+                throw new MusicUnavailableException("Failed to connect to Yandex Music");
+            }
+
             return;
         }
 
-        checkForManuallyStartedYandexMusic();
+        if (!launchIfNeeded) {
+            checkForManuallyStartedYandexMusic();
+            return;
+        }
+
+        System.out.println("Yandex Music is required by command. Preparing application...");
+
+        try {
+            launcher.ensureRunning();
+        }
+        catch (RuntimeException exception) {
+            throw new MusicUnavailableException("Failed to start Yandex Music", exception);
+        }
+
+        if (!launcher.isCdpAvailable()) {
+            throw new MusicUnavailableException("Yandex Music CDP is unavailable after startup");
+        }
+
+        connect();
+
+        if (session == null) {
+            throw new MusicUnavailableException("Failed to connect to Yandex Music after startup");
+        }
     }
 
     private <T> void handleOperationFailure(RuntimeException error, CompletableFuture<T> future) {
