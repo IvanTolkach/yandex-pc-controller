@@ -18,6 +18,7 @@ public class ReconnectingMusicController implements MusicController, AutoCloseab
     private final YandexMusicLauncher launcher;
 
     private boolean initialLaunchAttempt;
+    private boolean restartAttemptedForCurrentAppRun;
 
     private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor(
             runnable -> {
@@ -128,6 +129,65 @@ public class ReconnectingMusicController implements MusicController, AutoCloseab
             controller.volumeDown();
             return null;
         });
+    }
+
+    private void checkForManuallyStartedYandexMusic() {
+        if (closing || session != null) {
+            return;
+        }
+
+        boolean running;
+
+        try {
+            running = launcher.isRunning();
+        }
+        catch (RuntimeException exception) {
+            System.err.println( "Failed to check Yandex Music process: " + exception.getMessage());
+
+            return;
+        }
+
+        if (!running) {
+            restartAttemptedForCurrentAppRun = false;
+            return;
+        }
+
+        if (launcher.isCdpAvailable()) {
+            return;
+        }
+
+        if (restartAttemptedForCurrentAppRun) {
+            return;
+        }
+
+        restartAttemptedForCurrentAppRun = true;
+
+        executor.schedule(this::restartIfStillRunningWithoutCdp, 2, TimeUnit.SECONDS);
+    }
+
+    private void restartIfStillRunningWithoutCdp() {
+        if (closing || session != null) {
+            return;
+        }
+
+        try {
+            if (!launcher.isRunning()) {
+                restartAttemptedForCurrentAppRun = false;
+                return;
+            }
+
+            if (launcher.isCdpAvailable()) {
+                connect();
+                return;
+            }
+
+            launcher.restartRunningWithCdp();
+
+            connect();
+        }
+        catch (RuntimeException exception) {
+            System.err.println("Failed to restart Yandex Music with CDP: " + exception.getMessage());
+        }
     }
 
     private void launchOnStartup() {
@@ -262,7 +322,12 @@ public class ReconnectingMusicController implements MusicController, AutoCloseab
 
         try {
             if (session == null) {
-                scheduleReconnect();
+                checkForManuallyStartedYandexMusic();
+
+                if (launcher.isCdpAvailable()) {
+                    connect();
+                }
+
                 return;
             }
 

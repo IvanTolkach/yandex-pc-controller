@@ -49,6 +49,36 @@ public class YandexMusicLauncher {
         startAndWait(executable);
     }
 
+    public boolean isCdpAvailable() {
+        return cdpProbe.isAvailable();
+    }
+
+    public boolean isRunning() {
+        Path executable = executableLocator.locate();
+
+        return !findRunningProcesses(executable).isEmpty();
+    }
+
+    public void restartRunningWithCdp() {
+        Path executable = executableLocator.locate();
+
+        List<ProcessHandle> processes = findRunningProcesses(executable);
+
+        if (processes.isEmpty()) {
+            throw new YandexMusicLaunchException("Yandex Music is not running");
+        }
+
+        if (cdpProbe.isAvailable()) {
+            return;
+        }
+
+        System.out.println("Yandex Music is running without CDP. Restarting...");
+
+        stopProcess(processes);
+
+        startAndWait(executable);
+    }
+
     private void restart(Path executable, List<ProcessHandle> runningProcesses) {
         stopProcess(runningProcesses);
 
