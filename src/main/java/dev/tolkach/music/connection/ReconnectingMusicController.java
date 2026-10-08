@@ -12,8 +12,6 @@ public class ReconnectingMusicController implements MusicController, AutoCloseab
 
     private static final Duration HEALTH_CHECK_INTERVAL = Duration.ofSeconds(5);
 
-    private static final long[] RECONNECT_DELAYS_SECONDS = {1, 2, 4, 8, 10};
-
     private final YandexMusicSessionFactory sessionFactory;
     private final YandexMusicLauncher launcher;
 
@@ -31,10 +29,6 @@ public class ReconnectingMusicController implements MusicController, AutoCloseab
     );
 
     private YandexMusicSession session;
-
-    private int reconnectAttempt;
-
-    private boolean reconnectScheduled;
 
     private volatile boolean connected;
 
@@ -237,27 +231,22 @@ public class ReconnectingMusicController implements MusicController, AutoCloseab
     }
 
     private void ensureConnection() {
-        if (session == null) {
+        if (session != null) {
+            if (session.ping()) {
+                return;
+            }
+
+            System.out.println("Yandex Music connection is stale.");
+
+            disconnect();
+        }
+
+        if (launcher.isCdpAvailable()) {
             connect();
-        }
-
-        if (session == null) {
             return;
         }
 
-        if (session.ping()) {
-            return;
-        }
-
-        System.out.println("Yandex Music connection is stale.");
-
-        disconnect();
-
-        connect();
-
-        if (session == null) {
-            scheduleReconnect();
-        }
+        checkForManuallyStartedYandexMusic();
     }
 
     private <T> void handleOperationFailure(RuntimeException error, CompletableFuture<T> future) {
@@ -265,7 +254,6 @@ public class ReconnectingMusicController implements MusicController, AutoCloseab
             System.out.println("Yandex Music connection lost during command.");
 
             disconnect();
-            scheduleReconnect();
 
             future.completeExceptionally(new MusicUnavailableException("Yandex Music connection was lost", error));
 
@@ -302,16 +290,13 @@ public class ReconnectingMusicController implements MusicController, AutoCloseab
 
             connected = true;
 
-            reconnectAttempt = 0;
-
             System.out.println("Connected to Yandex Music.");
         }
         catch (RuntimeException exception) {
             connected = false;
+            session = null;
 
             System.out.println("Yandex Music is unavailable: " + exception.getMessage());
-
-            scheduleReconnect();
         }
     }
 
@@ -320,17 +305,7 @@ public class ReconnectingMusicController implements MusicController, AutoCloseab
             return;
         }
 
-        try {
-            if (session == null) {
-                checkForManuallyStartedYandexMusic();
-
-                if (launcher.isCdpAvailable()) {
-                    connect();
-                }
-
-                return;
-            }
-
+        if (session != null) {
             if (session.ping()) {
                 return;
             }
@@ -338,15 +313,12 @@ public class ReconnectingMusicController implements MusicController, AutoCloseab
             System.out.println("Yandex Music connection lost.");
 
             disconnect();
-
-            scheduleReconnect();
         }
-        catch (RuntimeException exception) {
-            System.out.println("Yandex Music health check failed: " + exception.getMessage());
 
-            disconnect();
+        checkForManuallyStartedYandexMusic();
 
-            scheduleReconnect();
+        if (session == null && launcher.isCdpAvailable()) {
+            connect();
         }
     }
 
@@ -358,48 +330,6 @@ public class ReconnectingMusicController implements MusicController, AutoCloseab
             System.out.println("Unexpected Yandex Music health check error:");
             exception.printStackTrace();
         }
-    }
-
-    private boolean isSessionAlive() {
-        if (session == null) {
-            return false;
-        }
-
-        try {
-            return session.isAlive();
-        }
-        catch (RuntimeException exception) {
-            return false;
-        }
-    }
-
-    private void scheduleReconnect() {
-        if (closing || session != null || reconnectScheduled) {
-            return;
-        }
-
-        long delay = reconnectDelaySeconds();
-
-        reconnectScheduled = true;
-
-        System.out.println("Retrying Yandex Music connection in " + delay + "s...");
-
-        executor.schedule(() -> {
-            reconnectScheduled = false;
-
-            connect();
-            },
-                delay,
-                TimeUnit.SECONDS
-        );
-    }
-
-    private long reconnectDelaySeconds() {
-        int index = Math.min(reconnectAttempt, RECONNECT_DELAYS_SECONDS.length - 1);
-
-        reconnectAttempt++;
-
-        return RECONNECT_DELAYS_SECONDS[index];
     }
 
     private void disconnect() {
