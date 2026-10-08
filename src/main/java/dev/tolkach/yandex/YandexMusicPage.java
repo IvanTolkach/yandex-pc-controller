@@ -11,6 +11,8 @@ public class YandexMusicPage {
 
     private static final String PLAYERBAR_TEST_ID = "PLAYERBAR_DESKTOP";
 
+    private static final String SEARCH_PAGE_TEST_ID = "SEARCH_PAGE";
+
     private final Page page;
 
     public YandexMusicPage(Page page) {
@@ -18,13 +20,27 @@ public class YandexMusicPage {
     }
 
     public SearchPage openSearch() {
-        if (page.url().endsWith("/search")) {
+        if (page.url().startsWith("music-application://desktop/search")) {
             return new SearchPage(page);
         }
 
-        Locator searchLink = page.getByTestId(SEARCH_NAVIGATION_TEST_ID);
+        Locator searchNavigation = page.getByTestId(SEARCH_NAVIGATION_TEST_ID);
 
-        searchLink.click();
+        try {
+            searchNavigation.click(new Locator.ClickOptions().setTimeout(3_000));
+        }
+        catch (TimeoutError e) {
+            System.out.println("Search navigation is unstable. Using DOM click fallback.");
+
+            searchNavigation.evaluate("element => element.click()");
+        }
+
+        page.getByTestId(SEARCH_PAGE_TEST_ID).waitFor(
+                new Locator
+                        .WaitForOptions()
+                        .setState(WaitForSelectorState.VISIBLE)
+                        .setTimeout(10_000)
+        );
 
         return new SearchPage(page);
     }

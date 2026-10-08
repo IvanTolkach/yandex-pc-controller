@@ -169,44 +169,22 @@ public class SearchPage {
     }
 
     public void playTopResult() {
-        Locator bestResults = page.getByTestId("SEARCH_BEST_RESULTS");
+        Locator topResults = page.locator("""
+                [data-test-id="SEARCH_PAGE_RESULTS_TOP"],
+                [data-test-id="SEARCH_BEST_RESULTS"]
+                """).first();
 
-        bestResults.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(10_000));
+        topResults.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(10_000));
 
-        Locator playButtons = bestResults.getByTestId(PLAY_BUTTON_TEST_ID);
+        Locator playButton = topResults.getByTestId(PLAY_BUTTON_TEST_ID).first();
 
-        for (int i = 0; i < playButtons.count(); i++) {
-            Locator button = playButtons.nth(i);
+        playButton.waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(5_000));
 
-            if (!button.isVisible()) {
-                continue;
-            }
-
-            if (!button.isEnabled()) {
-                continue;
-            }
-
-            button.click();
-
-            return;
+        if (!playButton.isEnabled()) {
+            throw new IllegalStateException("Top search result cannot be played");
         }
 
-        Locator tracks = page.getByTestId(TRACK_CARD_TEST_ID);
-
-        if (tracks.count() > 0) {
-            Locator firstTrack = tracks.first();
-
-            Locator playButton = firstTrack.getByTestId(PLAY_BUTTON_TEST_ID);
-
-            if (playButton.count() > 0 && playButton.first().isVisible() && playButton.first().isEnabled()) {
-
-                playButton.first().click();
-
-                return;
-            }
-        }
-
-        throw new IllegalStateException("No playable search result found");
+        playButton.click();
     }
 
     private void waitForTrackResult() {
@@ -279,22 +257,6 @@ public class SearchPage {
             }
         }
         throw new IllegalArgumentException("Parameter '" + parameter + "' not found in: " + href);
-    }
-
-    private AlbumSearchResult readAlbum(Locator albumItem) {
-        Locator titleLink = albumItem.getByTestId(ALBUM_TITLE_LINK_TEST_ID);
-
-        String title = titleLink.innerText().trim();
-
-        String href = titleLink.getAttribute("href");
-
-        if (href == null || href.isBlank()) {
-            throw new IllegalStateException("Album href is missing for: " + title);
-        }
-
-        String albumId = extractQueryParameter(href, "albumId");
-
-        return new AlbumSearchResult(title, albumId);
     }
 
     public Page page() {
