@@ -1,6 +1,7 @@
 package dev.tolkach.music.connection;
 
 import dev.tolkach.music.MusicController;
+import dev.tolkach.music.launcher.YandexMusicLauncher;
 import dev.tolkach.yandex.model.PlaybackState;
 
 import java.time.Duration;
@@ -14,6 +15,9 @@ public class ReconnectingMusicController implements MusicController, AutoCloseab
     private static final long[] RECONNECT_DELAYS_SECONDS = {1, 2, 4, 8, 10};
 
     private final YandexMusicSessionFactory sessionFactory;
+    private final YandexMusicLauncher launcher;
+
+    private boolean initialLaunchAttempt;
 
     private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor(
             runnable -> {
@@ -35,12 +39,16 @@ public class ReconnectingMusicController implements MusicController, AutoCloseab
 
     private volatile boolean closing;
 
-    public ReconnectingMusicController(YandexMusicSessionFactory sessionFactory) {
+    public ReconnectingMusicController(YandexMusicSessionFactory sessionFactory, YandexMusicLauncher launcher) {
         this.sessionFactory = sessionFactory;
+        this.launcher = launcher;
     }
 
     public void start() {
-        executor.execute(this::connect);
+        executor.execute(() -> {
+            launchOnStartup();
+            connect();
+        });
 
         executor.scheduleWithFixedDelay(
                 this::safeHealthCheck,
@@ -120,6 +128,23 @@ public class ReconnectingMusicController implements MusicController, AutoCloseab
             controller.volumeDown();
             return null;
         });
+    }
+
+    private void launchOnStartup() {
+        if (initialLaunchAttempt) {
+            return;
+        }
+
+        initialLaunchAttempt = true;
+
+        try {
+            launcher.ensureRunning();
+
+            System.out.println("Initial Yandex Music startup completed.");
+        }
+        catch (RuntimeException exception) {
+            System.err.println("Failed to prepare Yandex Music: " + exception.getMessage());
+        }
     }
 
     private <T> T invoke(Function<MusicController, T> operation) {

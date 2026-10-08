@@ -4,10 +4,14 @@ import dev.tolkach.gateway.client.GatewayClient;
 import dev.tolkach.music.commands.*;
 import dev.tolkach.music.connection.ReconnectingMusicController;
 import dev.tolkach.music.connection.YandexMusicSessionFactory;
+import dev.tolkach.music.launcher.YandexMusicExecutableLocator;
+import dev.tolkach.music.launcher.YandexMusicLaunchConfig;
+import dev.tolkach.music.launcher.YandexMusicLauncher;
 import dev.tolkach.music.protocol.*;
 
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 
 public class Main {
 
@@ -20,9 +24,13 @@ public class Main {
     static void main() {
         System.setOut(new PrintStream(System.out, true, StandardCharsets.UTF_8));
 
+        YandexMusicLaunchConfig launchConfig = new YandexMusicLaunchConfig(CDP_URL, Duration.ofSeconds(20), Duration.ofMillis(500));
+
+        YandexMusicLauncher launcher = new YandexMusicLauncher(launchConfig, new YandexMusicExecutableLocator());
+
         YandexMusicSessionFactory sessionFactory = new YandexMusicSessionFactory(CDP_URL);
 
-        try (ReconnectingMusicController musicController = new ReconnectingMusicController(sessionFactory);
+        try (ReconnectingMusicController musicController = new ReconnectingMusicController(sessionFactory, launcher);
              GatewayClient gatewayClient = createGatewayClient(musicController)) {
 
             musicController.start();
